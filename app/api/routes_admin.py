@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 
+from app.core.config import settings
 from app.core.security import verify_api_key
 from app.models.admin_models import AdminRobotSummaryResponse, AdminSystemSummaryResponse, RecoveryActionResponse
 from app.services.admin_service import admin_service
@@ -27,4 +28,9 @@ def recover_agent(agent_id: str) -> RecoveryActionResponse:
 
 @router.post("/recover-bulk")
 def recover_bulk(agent_ids: list[str]) -> dict:
-    return {"results": watchdog_service.scan_and_recover(agent_ids)}
+    limited = agent_ids[: settings.max_scale_recover_agents]
+    return {
+        "requested": len(agent_ids),
+        "processed": len(limited),
+        "results": watchdog_service.scan_and_recover(limited),
+    }
