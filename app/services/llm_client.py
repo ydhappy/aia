@@ -21,15 +21,21 @@ class LLMClient:
         extras = state.get("extras", {})
         return bool(extras.get("require_llm", False))
 
-    def decide(self, state: dict[str, Any]) -> dict[str, Any] | None:
+    def build_prompt(self, context: dict[str, Any]) -> str:
+        return (
+            "You are a lightweight MMORPG AI agent assistant. "
+            "Return only one JSON object. "
+            "Allowed actions: MOVE, ATTACK, USE_SKILL, RETREAT, PICKUP, IDLE. "
+            "JSON schema: {\"action\": str, \"action_args\": object, \"confidence\": number, \"reason\": str}. "
+            "Never return markdown. Never return explanations outside JSON. "
+            f"Context: {context}"
+        )
+
+    def decide(self, context: dict[str, Any]) -> dict[str, Any] | None:
         if self.backend == "none":
             return None
 
-        prompt = (
-            "You are a lightweight game AI assistant. "
-            "Return one safe JSON action with keys action, action_args, confidence, reason. "
-            f"State: {state}"
-        )
+        prompt = self.build_prompt(context)
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
@@ -54,7 +60,10 @@ class LLMClient:
                         json={
                             "model": self.model,
                             "messages": [
-                                {"role": "system", "content": "Return only one safe action."},
+                                {
+                                    "role": "system",
+                                    "content": "Return exactly one JSON object with a single safe action.",
+                                },
                                 {"role": "user", "content": prompt},
                             ],
                             "temperature": 0.1,
