@@ -1,213 +1,317 @@
-# AIA - Lightweight Game AI Bridge Server
+# AIA
 
-경량 LLM/AI 에이전트 서버 예제입니다. 특정 언어에 종속되지 않고 **Java 8 / Java 17 / C++ / C# / Python** 등 다양한 게임 서버와 연동할 수 있도록 설계했습니다. 게임 서버는 상태와 로봇 관련 정보를 전달하고, AI 서버는 **허용된 액션 하나만 추천**합니다.
+AIA는 게임 서버에 붙는 **운영형 로봇 AI 브리지**입니다.
+기존 게임 서버를 유지한 채, 별도 프로세스로 분리 실행되는 Python 기반 AIA가 **판단 / 자동화 / 학습 / 성장 / 복구 / 관제**를 담당하도록 설계되어 있습니다.
 
-## 목표
-- 기존 게임 서버 유지
-- AI 서버는 별도 프로세스로 분리
-- 경량/저지연 우선
-- 규칙 엔진 우선, LLM은 보조 판단만 수행
-- 장애 시 즉시 폴백
-- 로봇 관련 정보 흡수 및 재사용
-- 경량 AI 에이전트 계층 포함
+기본 권장 구조는 다음과 같습니다.
+- **Game Server**: 실제 이동/공격/스킬 실행, 최종 검증, 상태/이벤트/피드백 기록
+- **AIA**: decide, automation, growth, anomaly detection, recovery, dashboard, scale
+- **DB**: 상태/이벤트/피드백/결정/추적 저장
+- **선택**: Redis, self-hosted LLM
 
-## 핵심 구조
-- **Game Server**: 상태 수집, 실제 액션 실행, 검증
-- **FastAPI AI Bridge**: `/observe`, `/decide`, `/health`, `/metrics`
-- **Robot Knowledge API**: `/robot/profile`, `/robot/event`, `/robot/{agent_id}`
-- **Agent Graph**: 위험도 평가, 전략 선택, LLM 힌트 여부 결정
-- **Policy Engine**: 규칙 엔진 + 상태/프로필/이벤트 기반 의사결정
-- **LLM Client**: llama.cpp 또는 Ollama 연동
-- **LLM Parser**: 안전한 JSON 액션 파싱
-- **State Store**: 최근 상태, 프로필, 이벤트, trace 저장
+DLL/EXE 중심 운영은 더 이상 기본 경로가 아니며, 현재 권장 경로는 **Python + Java 8 + script** 기반 로컬 분리 실행입니다.
 
-## 실행 API
-### `POST /observe`
-상태 적재 전용입니다.
+---
 
-### `POST /decide`
-현재 상태와 저장된 로봇 지식을 기반으로 허용 액션 하나를 반환합니다.
+## 1. 무엇을 해결하나
 
-### `POST /robot/profile`
-로봇 프로필을 저장합니다.
+AIA는 다음 문제를 해결하기 위한 계층입니다.
+- 게임 서버 코드를 크게 뜯지 않고 로봇 AI를 고도화
+- 로봇 상태/이벤트/피드백을 흡수해 더 일관된 판단 수행
+- 단순 규칙을 넘어 학습/성장/실패 패턴 반영
+- 운영 중 recovery, alerts, sharding, rebalance까지 지원
+- 같은 서버 내 로컬 HTTP 또는 DB bridge로 저지연 연동
 
-### `POST /robot/event`
-로봇의 최근 이벤트를 저장합니다.
+---
 
-### `GET /robot/{agent_id}`
-해당 로봇의 저장된 프로필, 최근 이벤트, 마지막 상태를 조회합니다.
+## 2. 현재 포함 기능
 
-### `GET /robot/{agent_id}/trace`
-해당 로봇의 최신 에이전트 trace를 조회합니다.
+### 판단 / 전술
+- `POST /observe`
+- `POST /decide`
+- `POST /api/v1/robot/sync`
+- rule-engine 우선, LLM은 보조
+- growth stage / anomaly / meta policy 반영
 
-### `GET /health`
-앱/LLM/캐시 상태를 반환합니다.
+### 로봇 지식 / 학습 / 성장
+- `POST /robot/profile`
+- `POST /robot/event`
+- `POST /robot/feedback`
+- `GET /robot/{agent_id}`
+- `GET /robot/{agent_id}/trace`
+- `GET /growth/{agent_id}`
+- 행동 학습, group learning, map-aware learning
+- growth score, role mastery, map mastery
+- failure tag 분석
+- autonomous runtime rebalance
 
-### `GET /metrics`
-간단한 운영 지표를 반환합니다.
+### 자동화 / 목표 / 경제 / NPC
+- `POST /automation/task`
+- `GET /automation/{agent_id}/next-step`
+- `GET /goal/{agent_id}`
+- goal / state machine / economy / npc 통합 next-step planning
 
-## 허용 액션
-- `MOVE`
-- `ATTACK`
-- `USE_SKILL`
-- `RETREAT`
-- `PICKUP`
-- `IDLE`
+### 운영 / 관제
+- `GET /health`
+- `GET /metrics`
+- `/admin/*`
+- `/dashboard/*`
+- `/alerts/*`
+- `/ops/*`
+- `/scale/*`
+- weighted shard balancing
+- rebalance recommendation
+- scheduler batch split
+- bulk recover limit
 
-## 로봇 지식 흡수 범위
-- 역할: healer / tank / dealer / collector / support / scout
-- 성향: aggressive / defensive / balanced / support
-- 선호 스킬 / 금지 스킬
-- 파티 정보 / 클랜 정보
-- 홈 좌표 / 순찰 포인트
-- 태그 / 노트 / 메타데이터
-- 최근 이벤트
-  - 예: `loot_detected`, `danger_zone`, `boss_spawn`, `party_member_down`
-- 전투 상태
-  - `nearby_enemies`, `nearby_allies`, `buffs`, `debuffs`, `aggro_targets`
+### DB bridge
+- `/db-bridge/*`
+- SQLite / PostgreSQL / MySQL 지원
+- poll limit 적용
+- decision / trace batch write 지원
 
-## 요청 예시: 상태
-```json
-{
-  "agent_id": "bot_001",
-  "tick": 101,
-  "state": {
-    "hp": 45,
-    "mp": 20,
-    "x": 100,
-    "y": 200,
-    "map_id": 4,
-    "heading": 2,
-    "target_id": "mob_1",
-    "target_distance": 1,
-    "target_hp": 80,
-    "is_under_attack": true,
-    "nearby_enemies": 2,
-    "nearby_allies": 1,
-    "safe_zone": false,
-    "can_teleport": true,
-    "weight_percent": 44,
-    "cooldowns": {
-      "heal": 0,
-      "fireball": 5
-    },
-    "inventory": {
-      "potion": 2
-    },
-    "buffs": [],
-    "debuffs": [],
-    "aggro_targets": ["mob_1"],
-    "extras": {}
-  }
-}
-```
+### 멘트 / 토크 / persona
+- MBTI / 세대 / 말투 / 줄임말 / 밈 계층
+- 반말 / 존댓말 / 반존댓말 / 줄임말 / 밈 톤 지원
+- `GET /goal/{agent_id}` 응답에 `persona`, `talk` 포함
 
-## 요청 예시: 로봇 프로필
-```json
-{
-  "agent_id": "bot_001",
-  "name": "PriestAlpha",
-  "role": "healer",
-  "style": "support",
-  "party_id": "party_a",
-  "clan_id": "clan_blue",
-  "patrol_points": [{"x": 100, "y": 200}, {"x": 110, "y": 205}],
-  "preferred_skills": ["support_heal", "heal"],
-  "banned_skills": [],
-  "tags": ["raid", "night-shift"],
-  "notes": ["prioritize party sustain"],
-  "metadata": {
-    "server_group": "main"
-  }
-}
-```
+---
 
-## 요청 예시: 로봇 이벤트
-```json
-{
-  "agent_id": "bot_001",
-  "tick": 102,
-  "event_type": "loot_detected",
-  "severity": "low",
-  "message": "rare item on floor",
-  "data": {
-    "item_id": "rare_sword"
-  }
-}
-```
+## 3. 권장 운영 구조
 
-## 응답 예시
-```json
-{
-  "action": "USE_SKILL",
-  "action_args": {
-    "skill": "heal",
-    "target": "self"
-  },
-  "confidence": 0.98,
-  "reason": "low_hp_and_heal_ready",
-  "source": "rule_engine"
-}
-```
+### 가장 권장되는 방식
+**같은 서버 내 분리 실행 + DB + 로컬 HTTP 혼합형**
 
-## 연동 방식
-AI 서버는 HTTP REST 기준입니다. 어느 언어의 게임 서버든 상태를 JSON으로 보내고, AI 응답을 파싱한 후 **서버 측 검증**을 거쳐 실제 행동을 실행합니다.
+- 게임서버: Java 8
+- AIA: Python
+- 게임서버 → AIA: `127.0.0.1` 로컬 HTTP
+- 게임서버 ↔ DB: 상태/이벤트/피드백/결정 기록
+- AIA ↔ DB: poll / write / batch write
 
-### 권장 연동 순서
-1. 게임 상태 수집
-2. 필요 시 `/robot/profile` 로 로봇 기본 정보 저장
-3. 전투/파밍/파티 상황 발생 시 `/robot/event` 로 최근 이벤트 적재
-4. `/observe` 호출
-5. 행동 필요 시 `/decide` 호출
-6. 필요 시 `/robot/{agent_id}/trace` 로 판단 흐름 확인
-7. 반환 액션 검증
-8. 실제 게임 서버에서 실행
+이 방식의 장점:
+- 외부 서버 불필요
+- 지연 최소화
+- 게임서버 코드 수정 최소화
+- AIA가 주도적으로 운영 가능
+- 장애 시 fallback 설계가 명확함
 
-## 로컬 실행
+---
+
+## 4. 클론 후 바로 시작하기
+
+### 요구사항
+- Python 3.11+
+- Java 8 서버 연동 시 Java 8 환경
+- 선택: PostgreSQL / MySQL / Redis
+
+### 1) 저장소 클론
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+git clone <repo-url>
+cd aia
 ```
 
-## Docker 실행
+### 2) 로컬 부트스트랩
 ```bash
-docker compose up --build
+python scripts/bootstrap_local.py
 ```
 
-## 환경변수
-`.env.example` 참고
+이 스크립트가 수행하는 작업:
+- `.venv` 생성
+- pip 업그레이드
+- `requirements.txt` 설치
+- `.env.example` → `.env` 복사(없을 때만)
+- `runtime/`, `runtime/learning_journal/` 디렉토리 생성
 
-## LLM 백엔드
-운영:
-- `llama.cpp server` 권장
+### 3) 환경값 확인
+`.env`를 열어서 최소한 다음 항목을 확인합니다.
+- `ENABLE_API_KEY_AUTH`
+- `API_KEY`
+- `DB_BRIDGE_BACKEND`
+- `DB_BRIDGE_POSTGRES_DSN` 또는 `DB_BRIDGE_MYSQL_DSN`
+- `STATE_STORE_MODE`
+- `REDIS_URL`
 
-개발:
-- `Ollama` 지원
+### 4) AIA 실행
+```bash
+.venv/bin/python scripts/run_local_aia.py
+```
 
-기본 동작은 **규칙 엔진 우선**입니다. LLM은 필요한 경우에만 사용합니다.
+Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
-## 안정화 원칙
-- 매 틱 LLM 호출 금지
-- 액션 화이트리스트 강제
-- 잘못된 LLM 응답 즉시 폴백
-- 타임아웃 필수
-- 에이전트 trace는 진단용이며 직접 실행 권한이 없음
-- 게임 액션은 AI 서버가 직접 실행하지 않음
-- 실제 액션 실행은 게임 서버가 담당
+기본 실행 주소:
+- `127.0.0.1:8000`
 
-## 토크 / 멘트
-- 가볍고 안정적으로 게임 서버와 연동되는 AI 브리지 서버를 목표로 합니다.
-- 모든 판단을 LLM에 맡기지 않고, 규칙 엔진과 상태머신을 중심으로 운영 안정성을 확보합니다.
-- 로봇의 역할, 성향, 장비 성격, 최근 이벤트를 흡수하여 더 일관된 행동을 유도합니다.
-- 에이전트 trace를 제공하여 디버깅과 운영 분석을 쉽게 합니다.
-- 코드량보다 단순성, 추적 가능한 로그, 실패 시 폴백을 우선합니다.
+---
 
-## 다음 확장 포인트
-- Redis 연동 고도화
-- API Key 인증 추가
-- Java / C++ / Python 샘플 클라이언트 확장
-- GitHub Actions 확장
-- NPC 대화용 보조 LLM 노드 추가
-- 장기 메모리 / 행동 이력 분석 추가
+## 5. Java 8 서버 연동
+
+현재 저장소에는 Java 8 최소 연동 스캐폴드가 포함되어 있습니다.
+
+### HTTP 연동기
+- `integration/java8/LocalAiaClient.java`
+
+용도:
+- `/decide`
+- `/api/v1/robot/sync`
+- `/robot/feedback`
+호출
+
+### DB 혼합형 poller
+- `integration/java8/DbDecisionPoller.java`
+
+용도:
+- `robot_decision` 테이블의 최신 action 읽기
+
+### 권장 방식
+- 상태 / 이벤트 / 피드백 / 장기 이력 → DB
+- 즉시 판단 / 긴급 전술 판단 → 로컬 HTTP
+
+즉, **DB + HTTP 혼합형**이 기본 권장안입니다.
+
+---
+
+## 6. 스크립트
+
+### 부트스트랩
+- `scripts/bootstrap_local.py`
+
+### 로컬 AIA 실행
+- `scripts/run_local_aia.py`
+
+### scheduler cycle 실행
+- `scripts/run_scheduler_cycle.py`
+
+### unified API 부하 테스트
+- `scripts/load_test_unified.py`
+
+---
+
+## 7. 주요 API
+
+### 즉시 판단
+- `POST /observe`
+- `POST /decide`
+- `POST /api/v1/robot/sync`
+
+### 로봇 데이터
+- `POST /robot/profile`
+- `POST /robot/event`
+- `POST /robot/feedback`
+- `GET /robot/{agent_id}`
+- `GET /robot/{agent_id}/trace`
+
+### 성장 / 목표 / 자동화
+- `GET /growth/{agent_id}`
+- `GET /goal/{agent_id}`
+- `POST /automation/task`
+- `GET /automation/{agent_id}/next-step`
+
+### 운영
+- `GET /health`
+- `GET /metrics`
+- `POST /alerts/evaluate`
+- `POST /dashboard/shards-weighted`
+- `POST /dashboard/rebalance`
+- `POST /ops/scheduler/run`
+
+### DB bridge
+- `GET /db-bridge/states`
+- `GET /db-bridge/events`
+- `GET /db-bridge/feedback`
+- `POST /db-bridge/decision`
+- `POST /db-bridge/trace`
+
+---
+
+## 8. 학습 / 성장 / 기록 저장 정책
+
+학습/성장을 위해 **기록 저장은 필요**하지만, 영구 누적은 권장하지 않습니다.
+
+현재 정책:
+- feedback 처리 시 AIA 내부 전용 폴더에 임시 기록 저장
+- 저장 위치: `runtime/learning_journal/<agent_id>/...json`
+- autonomous growth rebalance 적용 후 자동 정리
+
+즉:
+- 학습 반영 전 상태는 잠깐 남기고
+- 성장 반영이 끝나면 삭제하는 구조입니다.
+
+관련 설정:
+- `LEARNING_JOURNAL_ENABLED`
+- `LEARNING_JOURNAL_PATH`
+- `LEARNING_JOURNAL_KEEP_LAST`
+
+---
+
+## 9. 운영 안정화 원칙
+
+- 게임서버는 실행과 최종 검증 담당
+- AIA는 판단/학습/자동화/복구 담당
+- bulk scale에서는 LLM 의존도를 낮추고 rule-engine 우선
+- `scheduler_cycle_batch_size` 사용
+- `db_bridge_poll_limit`, `db_bridge_write_batch_size` 사용
+- `trace_compact_mode` 사용 가능
+- weighted shard balancing / rebalance 활용
+- alerts로 recovery ratio 등 이상 징후 감시
+- 게임서버는 반드시 fallback 보유
+  - IDLE
+  - RETREAT
+  - 기본 서버 AI
+
+---
+
+## 10. 말투 / persona 계층
+
+`profile.metadata`에 다음 필드를 둘 수 있습니다.
+- `mbti`
+- `generation`
+- `speech_level`
+- `relationship`
+- `speech_mode`
+- `slang_level`
+- `meme_level`
+
+지원되는 표현 계층 예:
+- 반말
+- 존댓말
+- 반존댓말
+- 줄임말
+- 밈 톤
+
+`GET /goal/{agent_id}` 응답에는 다음이 함께 포함됩니다.
+- `persona`
+- `talk`
+
+즉, 행동 이유와 멘트를 운영 로그/NPC 대사/디버그 메시지에 그대로 활용할 수 있습니다.
+
+---
+
+## 11. 현재 기본 방향
+
+AIA의 기본 운영 경로는 다음입니다.
+- **Python + Java 8 + script**
+- 로컬 분리 실행
+- DB + 로컬 HTTP 혼합형
+- DLL/EXE 중심 운영은 비권장
+
+관련 참고:
+- `docs/python-java-script-only.md`
+- `docs/learning-journal-policy.md`
+- `docs/persona-layers.md`
+- `docs/load-and-sharding.md`
+- `docs/alerts-and-batching.md`
+
+---
+
+## 12. 현재 상태 요약
+
+현재 저장소는 다음을 포함합니다.
+- 운영형 로봇 AI 백엔드
+- DB bridge
+- growth / anomaly / meta policy
+- fully integrated automation
+- alerts / dashboard / ops / scale
+- Java 8 최소 연동 스캐폴드
+- clone 직후 바로 시작 가능한 bootstrap script
+
+즉, 지금은 **게임서버에 붙여 운영할 수 있는 상태**를 기준으로 정리되어 있습니다.
