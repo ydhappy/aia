@@ -1,9 +1,17 @@
 from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
-from app.models.request_models import RobotEventRequest, RobotProfileRequest
-from app.models.response_models import AgentTraceResponse, RobotEventResponse, RobotKnowledgeResponse, RobotProfileResponse
+from app.models.request_models import RobotEventRequest, RobotFeedbackRequest, RobotProfileRequest
+from app.models.response_models import (
+    AgentTraceResponse,
+    RobotEventResponse,
+    RobotFeedbackResponse,
+    RobotKnowledgeResponse,
+    RobotLearningStateResponse,
+    RobotProfileResponse,
+)
 from app.services.agent_service import agent_service
+from app.services.learning_service import learning_service
 from app.services.store_factory import store
 
 
@@ -22,6 +30,11 @@ def save_event(request: RobotEventRequest) -> RobotEventResponse:
     return RobotEventResponse(agent_id=request.agent_id)
 
 
+@router.post("/feedback", response_model=RobotFeedbackResponse)
+def submit_feedback(request: RobotFeedbackRequest) -> RobotFeedbackResponse:
+    return learning_service.submit_feedback(request)
+
+
 @router.get("/{agent_id}", response_model=RobotKnowledgeResponse)
 def get_robot_knowledge(agent_id: str) -> RobotKnowledgeResponse:
     return RobotKnowledgeResponse(
@@ -35,3 +48,8 @@ def get_robot_knowledge(agent_id: str) -> RobotKnowledgeResponse:
 @router.get("/{agent_id}/trace", response_model=AgentTraceResponse)
 def get_agent_trace(agent_id: str) -> AgentTraceResponse:
     return agent_service.get_trace(agent_id)
+
+
+@router.get("/{agent_id}/learning", response_model=RobotLearningStateResponse)
+def get_learning_state(agent_id: str) -> RobotLearningStateResponse:
+    return learning_service.get_learning_state(agent_id)
