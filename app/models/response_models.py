@@ -59,3 +59,14 @@ class RobotKnowledgeResponse(BaseModel):
 class AgentTraceResponse(BaseModel):
     agent_id: str
     trace: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotFeedbackResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot feedback stored"
+
+
+class RobotLearningStateResponse(BaseModel):
+    agent_id: str
+    learning_state: dict[str, Any] = Field(default_factory=dict)
