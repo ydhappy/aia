@@ -13,6 +13,11 @@ import java.sql.PreparedStatement;
  * - 희귀 아이템 발견
  * - 과적 발생
  * - 안전지대 진입
+ *
+ * 초보자 주의:
+ * - 현재 DB에 `robot_event` 테이블이 먼저 있어야 합니다.
+ * - `sql/aia_robot_schema.sql`를 먼저 적용하세요.
+ * - JDBC URL / user / password 는 현재 서버 DB 환경에 맞게 바꾸세요.
  */
 public class RobotEventWriter {
     private final String jdbcUrl;
