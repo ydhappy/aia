@@ -4,6 +4,7 @@ from app.core.security import verify_api_key
 from app.models.admin_models import AdminRobotSummaryResponse, AdminSystemSummaryResponse, RecoveryActionResponse
 from app.services.admin_service import admin_service
 from app.services.recovery_service import recovery_service
+from app.services.watchdog_service import watchdog_service
 
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(verify_api_key)])
@@ -22,3 +23,8 @@ def system_summary(agent_ids: list[str] = Query(default=[])) -> AdminSystemSumma
 @router.post("/recover/{agent_id}", response_model=RecoveryActionResponse)
 def recover_agent(agent_id: str) -> RecoveryActionResponse:
     return recovery_service.recover_agent(agent_id)
+
+
+@router.post("/recover-bulk")
+def recover_bulk(agent_ids: list[str]) -> dict:
+    return {"results": watchdog_service.scan_and_recover(agent_ids)}
