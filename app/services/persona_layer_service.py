@@ -6,12 +6,18 @@ class PersonaLayerService:
         generation = str(metadata.get("generation", "standard")).lower()
         speech_level = str(metadata.get("speech_level", "standard")).lower()
         relationship = str(metadata.get("relationship", "neutral")).lower()
+        speech_mode = str(metadata.get("speech_mode", "standard")).lower()
+        slang_level = str(metadata.get("slang_level", "none")).lower()
+        meme_level = str(metadata.get("meme_level", "none")).lower()
 
         return {
             "mbti": mbti,
             "generation": generation,
             "speech_level": speech_level,
             "relationship": relationship,
+            "speech_mode": speech_mode,
+            "slang_level": slang_level,
+            "meme_level": meme_level,
             "tone_bias": self._tone_bias(mbti, generation),
         }
 
