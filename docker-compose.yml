@@ -1,0 +1,9 @@
+services:
+  aia:
+    build: .
+    container_name: aia
+    env_file:
+      - .env.example
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
