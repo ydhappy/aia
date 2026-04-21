@@ -30,6 +30,7 @@ python one_click_start.py
 - 안전 기본값 적용
   - `STATE_STORE_MODE=memory`
   - `DB_BRIDGE_BACKEND=sqlite`
+  - `ENABLE_API_KEY_AUTH=false`
 - AIA 로컬 실행
 
 즉, Redis/MySQL/PostgreSQL 없이도 먼저 AIA 자체는 바로 띄울 수 있습니다.
