@@ -33,10 +33,29 @@ class AutomationService:
         tasks = [RobotAutomationTask(**item) for item in current.get("tasks", [])]
         return AutomationTaskListResponse(agent_id=agent_id, tasks=tasks)
 
+    def update_task_status(self, agent_id: str, task_id: str, status: str) -> AutomationTaskResponse:
+        current = store.get_learning_state(f"automation::{agent_id}") or {}
+        tasks = current.get("tasks", [])
+        for task in tasks:
+            if task.get("task_id") == task_id:
+                task["status"] = status
+                break
+        current["tasks"] = tasks
+        store.save_learning_state(f"automation::{agent_id}", current)
+        return AutomationTaskResponse(agent_id=agent_id, task_id=task_id, message=f"automation task {status}")
+
+    def delete_task(self, agent_id: str, task_id: str) -> AutomationTaskResponse:
+        current = store.get_learning_state(f"automation::{agent_id}") or {}
+        tasks = current.get("tasks", [])
+        tasks = [task for task in tasks if task.get("task_id") != task_id]
+        current["tasks"] = tasks
+        store.save_learning_state(f"automation::{agent_id}", current)
+        return AutomationTaskResponse(agent_id=agent_id, task_id=task_id, message="automation task deleted")
+
     def decide_next_step(self, agent_id: str, state: dict) -> AutomationDecisionResponse:
         current = store.get_learning_state(f"automation::{agent_id}") or {}
         tasks = current.get("tasks", [])
-        active_task = tasks[0] if tasks else {}
+        active_task = next((task for task in tasks if task.get("status") in {"pending", "running"}), {})
         next_step = self._build_next_step(active_task, state)
         return AutomationDecisionResponse(
             agent_id=agent_id,
@@ -76,6 +95,18 @@ class AutomationService:
                 "mode": mode,
                 "objective": "follow_party_and_support",
                 "party_id": params.get("party_id"),
+            }
+        if mode == "loot_loop":
+            return {
+                "mode": mode,
+                "objective": "scan_and_pickup_loot",
+                "area": params.get("area"),
+            }
+        if mode == "boss_watch":
+            return {
+                "mode": mode,
+                "objective": "watch_spawn_and_engage_or_report",
+                "boss_id": params.get("boss_id"),
             }
         return {
             "mode": mode,
