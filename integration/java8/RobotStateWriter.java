@@ -10,7 +10,8 @@ import java.sql.PreparedStatement;
  * 초보자용 설명:
  * - 이 클래스는 DB 연결만 맞으면 바로 쓸 수 있습니다.
  * - JDBC URL / user / password 만 현재 서버 환경에 맞게 바꾸면 됩니다.
- * - INSERT가 아니라 REPLACE INTO를 사용해 최신 상태 한 줄만 유지합니다.
+ * - 이 예시는 MySQL / MariaDB 기준으로 REPLACE INTO를 사용합니다.
+ * - PostgreSQL을 쓴다면 INSERT ... ON CONFLICT ... DO UPDATE 형태로 바꿔야 합니다.
  */
 public class RobotStateWriter {
     private final String jdbcUrl;
