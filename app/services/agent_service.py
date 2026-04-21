@@ -1,4 +1,5 @@
 from app.graphs.agent_graph import agent_graph
+from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
 from app.models.request_models import DecideRequest, ObserveRequest
 from app.models.response_models import AgentTraceResponse, DecideResponse, ObserveResponse
 from app.services.llm_client import llm_client
@@ -16,6 +17,9 @@ class AgentService:
             state=request.state.model_dump(),
         )
         return ObserveResponse(agent_id=request.agent_id, tick=request.tick)
+
+    def observe_batch(self, requests: list[ObserveRequest]) -> BatchObserveResponse:
+        return BatchObserveResponse(items=[self.observe(request) for request in requests])
 
     def get_trace(self, agent_id: str) -> AgentTraceResponse:
         return AgentTraceResponse(agent_id=agent_id, trace=state_store.get_trace(agent_id))
@@ -40,6 +44,9 @@ class AgentService:
                 if parsed:
                     valid, reason = action_validator.validate(parsed, request.state)
                     if valid:
+                        trace["final_source"] = parsed.source
+                        trace["final_reason"] = parsed.reason
+                        state_store.save_trace(request.agent_id, trace)
                         return parsed
                     trace["llm_validation_error"] = reason
                     state_store.save_trace(request.agent_id, trace)
@@ -82,6 +89,9 @@ class AgentService:
             trace["final_reason"] = fallback.reason
             state_store.save_trace(request.agent_id, trace)
             return fallback
+
+    def decide_batch(self, requests: list[DecideRequest]) -> BatchDecideResponse:
+        return BatchDecideResponse(items=[self.decide(request) for request in requests])
 
 
 agent_service = AgentService()
