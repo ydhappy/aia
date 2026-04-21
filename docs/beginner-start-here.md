@@ -15,8 +15,10 @@ cd aia
 ```
 
 ## 3. 가장 쉬운 시작
+가장 안전한 시작은 아래 한 줄입니다.
+
 ```bash
-python scripts/auto_connect_run.py
+python one_click_start.py
 ```
 
 이 스크립트가 하는 일:
@@ -25,7 +27,12 @@ python scripts/auto_connect_run.py
 - requirements 설치
 - `.env.example`를 `.env`로 복사
 - runtime 폴더 생성
+- 안전 기본값 적용
+  - `STATE_STORE_MODE=memory`
+  - `DB_BRIDGE_BACKEND=sqlite`
 - AIA 로컬 실행
+
+즉, Redis/MySQL/PostgreSQL 없이도 먼저 AIA 자체는 바로 띄울 수 있습니다.
 
 ## 4. DB를 같이 쓰려면
 MySQL/MariaDB 기준으로 먼저 SQL을 넣습니다.
@@ -47,6 +54,11 @@ mysql -u root -p your_database < sql/aia_robot_schema.sql
 Java 8 연동 파일:
 - `integration/java8/LocalAiaClient.java`
 - `integration/java8/DbDecisionPoller.java`
+- `integration/java8/RobotStateExtractor.java`
+- `integration/java8/RobotActionExecutor.java`
+- `integration/java8/RobotStateWriter.java`
+- `integration/java8/RobotEventWriter.java`
+- `integration/java8/RobotFeedbackWriter.java`
 
 ## 6. 확인할 API
 - `GET /health`
@@ -56,7 +68,7 @@ Java 8 연동 파일:
 - `GET /growth/{agent_id}`
 
 ## 7. 초보자 권장 순서
-1. `python scripts/auto_connect_run.py`
+1. `python one_click_start.py`
 2. 브라우저나 API 도구로 `/health` 확인
 3. DB를 쓸 경우 `sql/aia_robot_schema.sql` 적용
 4. Java 8 서버에서 상태/피드백 기록 추가
