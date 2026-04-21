@@ -7,23 +7,45 @@ class LearningService:
     def submit_feedback(self, request: RobotFeedbackRequest) -> RobotFeedbackResponse:
         current = store.get_learning_state(request.agent_id) or {}
         action_stats = current.get("action_stats", {})
-        stat = action_stats.get(
+        map_stats = current.get("map_action_stats", {})
+        map_id = str(request.context.get("map_id", "global"))
+
+        self._apply_decay(action_stats)
+        self._apply_decay(map_stats.get(map_id, {}))
+
+        global_stat = action_stats.get(
+            request.action,
+            {"count": 0, "reward_sum": 0.0, "success": 0, "failure": 0},
+        )
+        map_bucket = map_stats.get(map_id, {})
+        map_stat = map_bucket.get(
             request.action,
             {"count": 0, "reward_sum": 0.0, "success": 0, "failure": 0},
         )
 
-        stat["count"] += 1
-        stat["reward_sum"] += request.reward
-        if request.outcome == "success":
-            stat["success"] += 1
-        elif request.outcome == "failure":
-            stat["failure"] += 1
+        for stat in (global_stat, map_stat):
+            stat["count"] += 1
+            stat["reward_sum"] += request.reward
+            if request.outcome == "success":
+                stat["success"] += 1
+            elif request.outcome == "failure":
+                stat["failure"] += 1
 
-        action_stats[request.action] = stat
+        action_stats[request.action] = global_stat
+        map_bucket[request.action] = map_stat
+        map_stats[map_id] = map_bucket
+
         current["action_stats"] = action_stats
+        current["map_action_stats"] = map_stats
         current["last_feedback"] = request.model_dump()
         current["preferred_action"] = self._preferred_action(action_stats)
         current["avoid_action"] = self._avoid_action(action_stats)
+        current["preferred_action_by_map"] = {
+            key: self._preferred_action(value) for key, value in map_stats.items()
+        }
+        current["avoid_action_by_map"] = {
+            key: self._avoid_action(value) for key, value in map_stats.items()
+        }
 
         store.save_learning_state(request.agent_id, current)
         return RobotFeedbackResponse(agent_id=request.agent_id)
@@ -33,6 +55,10 @@ class LearningService:
             agent_id=agent_id,
             learning_state=store.get_learning_state(agent_id),
         )
+
+    def _apply_decay(self, action_stats: dict) -> None:
+        for stat in action_stats.values():
+            stat["reward_sum"] = float(stat.get("reward_sum", 0.0)) * 0.98
 
     def _preferred_action(self, action_stats: dict) -> str | None:
         best_action = None
