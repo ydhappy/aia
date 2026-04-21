@@ -28,12 +28,14 @@ class AgentService:
         store.increment_decide()
         profile = store.get_profile(request.agent_id)
         recent_events = store.get_recent_events(request.agent_id)
+        learning_state = store.get_learning_state(request.agent_id)
 
         trace = agent_graph.run(
             agent_id=request.agent_id,
             state=request.state,
             profile=profile,
             recent_events=recent_events,
+            learning_state=learning_state,
         )
         store.save_trace(request.agent_id, trace)
 
@@ -61,6 +63,8 @@ class AgentService:
             if valid:
                 trace["final_source"] = decision.source
                 trace["final_reason"] = decision.reason
+                trace["learning_preferred_action"] = learning_state.get("preferred_action")
+                trace["learning_avoid_action"] = learning_state.get("avoid_action")
                 store.save_trace(request.agent_id, trace)
                 return decision
 
