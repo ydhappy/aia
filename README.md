@@ -13,6 +13,28 @@ DLL/EXE 중심 운영은 더 이상 기본 경로가 아니며, 현재 권장 �
 
 ---
 
+## 0. 원클릭 시작
+
+가장 쉬운 시작 방법은 아래 한 줄입니다.
+
+```bash
+python one_click_start.py
+```
+
+이 파일이 자동으로 수행하는 일:
+- `.venv` 생성
+- pip 업그레이드
+- `requirements.txt` 설치
+- `.env.example`를 `.env`로 복사
+- `runtime/` 및 `runtime/learning_journal/` 생성
+- 기본 one-click 모드에서는 `sqlite` 기준으로 AIA 실행
+- AIA를 `127.0.0.1:8000` 에서 실행
+
+이 모드는 **초기 구동 / 테스트 / 단일 장비 분리 실행**에 가장 적합합니다.
+실운영에서 MySQL/PostgreSQL을 쓸 경우 `.env`만 조정하면 됩니다.
+
+---
+
 ## 1. 무엇을 해결하나
 
 AIA는 다음 문제를 해결하기 위한 계층입니다.
@@ -97,7 +119,7 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 
 ---
 
-## 4. 클론 후 바로 시작하기
+## 4. 수동 시작 경로
 
 ### 요구사항
 - Python 3.11+
@@ -114,13 +136,6 @@ cd aia
 ```bash
 python scripts/bootstrap_local.py
 ```
-
-이 스크립트가 수행하는 작업:
-- `.venv` 생성
-- pip 업그레이드
-- `requirements.txt` 설치
-- `.env.example` → `.env` 복사(없을 때만)
-- `runtime/`, `runtime/learning_journal/` 디렉토리 생성
 
 ### 3) 환경값 확인
 `.env`를 열어서 최소한 다음 항목을 확인합니다.
@@ -172,6 +187,9 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ## 6. 스크립트
 
+### 원클릭 시작
+- `one_click_start.py`
+
 ### 부트스트랩
 - `scripts/bootstrap_local.py`
 
@@ -184,9 +202,32 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 ### unified API 부하 테스트
 - `scripts/load_test_unified.py`
 
+### DB schema 안내
+- `scripts/init_db_schema.py`
+
 ---
 
-## 7. 주요 API
+## 7. SQL / DB 시작
+
+### SQL 파일
+- `sql/aia_robot_schema.sql`
+
+### MySQL/MariaDB 적용 예시
+```bash
+mysql -u root -p your_database < sql/aia_robot_schema.sql
+```
+
+그 다음 `.env` 예:
+```env
+DB_BRIDGE_BACKEND=mysql
+DB_BRIDGE_MYSQL_DSN=mysql+pymysql://user:password@127.0.0.1:3306/your_database
+```
+
+원클릭 모드에서는 기본값으로 `sqlite`를 사용하므로, DB를 따로 준비하지 않아도 AIA 기동 자체는 가능합니다.
+
+---
+
+## 8. 주요 API
 
 ### 즉시 판단
 - `POST /observe`
@@ -223,7 +264,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ---
 
-## 8. 학습 / 성장 / 기록 저장 정책
+## 9. 학습 / 성장 / 기록 저장 정책
 
 학습/성장을 위해 **기록 저장은 필요**하지만, 영구 누적은 권장하지 않습니다.
 
@@ -243,7 +284,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ---
 
-## 9. 운영 안정화 원칙
+## 10. 운영 안정화 원칙
 
 - 게임서버는 실행과 최종 검증 담당
 - AIA는 판단/학습/자동화/복구 담당
@@ -260,7 +301,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ---
 
-## 10. 말투 / persona 계층
+## 11. 말투 / persona 계층
 
 `profile.metadata`에 다음 필드를 둘 수 있습니다.
 - `mbti`
@@ -286,7 +327,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ---
 
-## 11. 현재 기본 방향
+## 12. 현재 기본 방향
 
 AIA의 기본 운영 경로는 다음입니다.
 - **Python + Java 8 + script**
@@ -300,10 +341,11 @@ AIA의 기본 운영 경로는 다음입니다.
 - `docs/persona-layers.md`
 - `docs/load-and-sharding.md`
 - `docs/alerts-and-batching.md`
+- `docs/beginner-start-here.md`
 
 ---
 
-## 12. 현재 상태 요약
+## 13. 현재 상태 요약
 
 현재 저장소는 다음을 포함합니다.
 - 운영형 로봇 AI 백엔드
@@ -312,6 +354,6 @@ AIA의 기본 운영 경로는 다음입니다.
 - fully integrated automation
 - alerts / dashboard / ops / scale
 - Java 8 최소 연동 스캐폴드
-- clone 직후 바로 시작 가능한 bootstrap script
+- clone 직후 바로 시작 가능한 bootstrap / one-click 스크립트
 
 즉, 지금은 **게임서버에 붙여 운영할 수 있는 상태**를 기준으로 정리되어 있습니다.
