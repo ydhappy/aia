@@ -52,6 +52,13 @@ class RedisStore:
         raw = self.client.get(self._key("trace", agent_id))
         return json.loads(raw) if raw else {}
 
+    def save_learning_state(self, agent_id: str, learning_state: dict) -> None:
+        self.client.set(self._key("learning", agent_id), json.dumps(learning_state))
+
+    def get_learning_state(self, agent_id: str) -> dict:
+        raw = self.client.get(self._key("learning", agent_id))
+        return json.loads(raw) if raw else {}
+
     def increment_decide(self) -> None:
         self._metrics["total_decide_requests"] += 1
 
