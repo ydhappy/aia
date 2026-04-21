@@ -9,6 +9,7 @@ from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_health import router as health_router
 from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_metrics import router as metrics_router
+from app.api.routes_ops import router as ops_router
 from app.api.routes_scale import router as scale_router
 from app.api.routes_unified import router as unified_router
 from app.api.routes_ws import router as ws_router
@@ -18,7 +19,7 @@ from app.core.security import ApiKeyError
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.9.0",
+    version="0.10.0",
     description="Lightweight AI bridge server for game server integration.",
 )
 
@@ -36,6 +37,7 @@ app.include_router(batch_router)
 app.include_router(dashboard_router)
 app.include_router(metrics_router)
 app.include_router(knowledge_router)
+app.include_router(ops_router)
 app.include_router(scale_router)
 app.include_router(unified_router)
 app.include_router(ws_router)
