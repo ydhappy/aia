@@ -35,6 +35,8 @@ def ensure_env() -> None:
             text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
         if "STATE_STORE_MODE=memory" not in text and "STATE_STORE_MODE=" in text:
             text = text.replace("STATE_STORE_MODE=redis", "STATE_STORE_MODE=memory")
+        if "ENABLE_API_KEY_AUTH=false" not in text and "ENABLE_API_KEY_AUTH=" in text:
+            text = text.replace("ENABLE_API_KEY_AUTH=true", "ENABLE_API_KEY_AUTH=false")
         ENV_FILE.write_text(text, encoding="utf-8")
 
 
@@ -59,11 +61,13 @@ def main() -> None:
     os.environ.setdefault("APP_PORT", "8000")
     os.environ.setdefault("DB_BRIDGE_BACKEND", "sqlite")
     os.environ.setdefault("STATE_STORE_MODE", "memory")
+    os.environ.setdefault("ENABLE_API_KEY_AUTH", "false")
 
     print("[one-click] startup summary")
     print("[one-click] mode : local single-host")
     print("[one-click] db   : sqlite (default one-click mode)")
     print("[one-click] store: memory (safe one-click mode)")
+    print("[one-click] auth : disabled (safe beginner mode)")
     print("[one-click] host : 127.0.0.1:8000")
     print("[one-click] next : use Java 8 adapter under integration/java8/")
     run([py, "scripts/run_local_aia.py"])
