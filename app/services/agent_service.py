@@ -4,6 +4,7 @@ from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
 from app.models.request_models import DecideRequest, ObserveRequest
 from app.models.response_models import AgentTraceResponse, DecideResponse, ObserveResponse
 from app.services.group_learning_service import group_learning_service
+from app.services.growth_service import growth_service
 from app.services.llm_client import llm_client
 from app.services.llm_parser import llm_parser
 from app.services.policy_engine import policy_engine
@@ -39,6 +40,7 @@ class AgentService:
             "llm_hint": trace.get("llm_hint"),
             "profile_hint": trace.get("profile_hint"),
             "runtime_override": trace.get("runtime_override"),
+            "growth_state": trace.get("growth_state"),
             "final_source": trace.get("final_source"),
             "final_reason": trace.get("final_reason"),
             "learning_state": trace.get("learning_state"),
@@ -50,6 +52,7 @@ class AgentService:
         profile = store.get_profile(request.agent_id)
         recent_events = store.get_recent_events(request.agent_id)
         learning_state = store.get_learning_state(request.agent_id)
+        growth_state = growth_service.get_growth_state(request.agent_id).model_dump()
 
         group_key = profile.get("party_id") or profile.get("role")
         if group_key:
@@ -66,6 +69,7 @@ class AgentService:
             learning_state=learning_state,
         )
         trace["runtime_override"] = override_info
+        trace["growth_state"] = growth_state
         store.save_trace(request.agent_id, self._compact_trace(trace))
 
         if trace.get("llm_hint"):
@@ -89,6 +93,7 @@ class AgentService:
                 recent_events=recent_events,
                 learning_state=learning_state,
                 runtime_override=override_info,
+                growth_state=growth_state,
             )
             valid, reason = action_validator.validate(decision, request.state)
             if valid:
@@ -96,6 +101,7 @@ class AgentService:
                 trace["final_reason"] = decision.reason
                 trace["learning_preferred_action"] = learning_state.get("preferred_action")
                 trace["learning_avoid_action"] = learning_state.get("avoid_action")
+                trace["growth_stage"] = growth_state.get("stage")
                 store.save_trace(request.agent_id, self._compact_trace(trace))
                 return decision
 
