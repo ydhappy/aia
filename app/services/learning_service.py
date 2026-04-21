@@ -3,6 +3,7 @@ from app.models.request_models import RobotFeedbackRequest
 from app.models.response_models import RobotFeedbackResponse, RobotLearningStateResponse
 from app.services.group_learning_service import group_learning_service
 from app.services.growth_service import growth_service
+from app.services.learning_journal_service import learning_journal_service
 from app.services.store_factory import store
 
 
@@ -51,6 +52,11 @@ class LearningService:
         }
 
         store.save_learning_state(request.agent_id, current)
+        learning_journal_service.append(request.agent_id, {
+            "type": "feedback",
+            "payload": request.model_dump(),
+            "learning_state": current,
+        })
         growth_service.update_from_feedback(request.agent_id, request.model_dump())
 
         group_key = request.context.get("group_key") or request.context.get("party_id") or request.context.get("role")
