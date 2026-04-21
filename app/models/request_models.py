@@ -67,3 +67,12 @@ class RobotEventRequest(BaseModel):
     severity: Literal["low", "medium", "high"] = "low"
     message: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotFeedbackRequest(BaseModel):
+    agent_id: str
+    tick: int = Field(ge=0)
+    action: str
+    reward: float = 0.0
+    outcome: Literal["success", "partial", "failure"] = "partial"
+    context: dict[str, Any] = Field(default_factory=dict)
