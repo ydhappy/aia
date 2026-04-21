@@ -4,7 +4,7 @@ from app.core.security import verify_api_key
 from app.models.request_models import RobotEventRequest, RobotProfileRequest
 from app.models.response_models import AgentTraceResponse, RobotEventResponse, RobotKnowledgeResponse, RobotProfileResponse
 from app.services.agent_service import agent_service
-from app.services.state_store import state_store
+from app.services.store_factory import store
 
 
 router = APIRouter(prefix="/robot", tags=["robot"], dependencies=[Depends(verify_api_key)])
@@ -12,13 +12,13 @@ router = APIRouter(prefix="/robot", tags=["robot"], dependencies=[Depends(verify
 
 @router.post("/profile", response_model=RobotProfileResponse)
 def save_profile(request: RobotProfileRequest) -> RobotProfileResponse:
-    state_store.save_profile(request.agent_id, request.model_dump())
+    store.save_profile(request.agent_id, request.model_dump())
     return RobotProfileResponse(agent_id=request.agent_id)
 
 
 @router.post("/event", response_model=RobotEventResponse)
 def save_event(request: RobotEventRequest) -> RobotEventResponse:
-    state_store.save_event(request.agent_id, request.model_dump())
+    store.save_event(request.agent_id, request.model_dump())
     return RobotEventResponse(agent_id=request.agent_id)
 
 
@@ -26,9 +26,9 @@ def save_event(request: RobotEventRequest) -> RobotEventResponse:
 def get_robot_knowledge(agent_id: str) -> RobotKnowledgeResponse:
     return RobotKnowledgeResponse(
         agent_id=agent_id,
-        profile=state_store.get_profile(agent_id),
-        recent_events=state_store.get_recent_events(agent_id),
-        last_state=state_store.get_state(agent_id),
+        profile=store.get_profile(agent_id),
+        recent_events=store.get_recent_events(agent_id),
+        last_state=store.get_state(agent_id),
     )
 
 
