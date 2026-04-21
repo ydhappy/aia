@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434"
     llm_model: str = "qwen2.5:3b-instruct"
     llm_timeout_seconds: float = 3.0
+    llm_api_key: str = ""
+    llm_provider: str = "generic"
 
     state_store_mode: str = "memory"
     redis_url: str = "redis://localhost:6379/0"
