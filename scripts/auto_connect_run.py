@@ -28,6 +28,14 @@ def python_in_venv() -> str:
 def ensure_env() -> None:
     if ENV_EXAMPLE.exists() and not ENV_FILE.exists():
         shutil.copyfile(ENV_EXAMPLE, ENV_FILE)
+    if ENV_FILE.exists():
+        text = ENV_FILE.read_text(encoding="utf-8")
+        if "STATE_STORE_MODE=memory" not in text and "STATE_STORE_MODE=" in text:
+            text = text.replace("STATE_STORE_MODE=redis", "STATE_STORE_MODE=memory")
+        if "DB_BRIDGE_BACKEND=sqlite" not in text and "DB_BRIDGE_BACKEND=" in text:
+            text = text.replace("DB_BRIDGE_BACKEND=mysql", "DB_BRIDGE_BACKEND=sqlite")
+            text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
+        ENV_FILE.write_text(text, encoding="utf-8")
 
 
 def ensure_runtime_dirs() -> None:
@@ -48,9 +56,12 @@ def main() -> None:
 
     os.environ.setdefault("APP_HOST", "127.0.0.1")
     os.environ.setdefault("APP_PORT", "8000")
+    os.environ.setdefault("STATE_STORE_MODE", "memory")
+    os.environ.setdefault("DB_BRIDGE_BACKEND", "sqlite")
 
     print("[auto-connect-run] bootstrap complete")
     print("[auto-connect-run] AIA will run on 127.0.0.1:8000")
+    print("[auto-connect-run] safe defaults: STATE_STORE_MODE=memory, DB_BRIDGE_BACKEND=sqlite")
     print("[auto-connect-run] if you use MySQL/MariaDB, import sql/aia_robot_schema.sql first")
     run([py, "scripts/run_local_aia.py"])
 
