@@ -9,14 +9,17 @@
 - 규칙 엔진 우선, LLM은 보조 판단만 수행
 - 장애 시 즉시 폴백
 - 로봇 관련 정보 흡수 및 재사용
+- 경량 AI 에이전트 계층 포함
 
 ## 핵심 구조
 - **Game Server**: 상태 수집, 실제 액션 실행, 검증
 - **FastAPI AI Bridge**: `/observe`, `/decide`, `/health`, `/metrics`
 - **Robot Knowledge API**: `/robot/profile`, `/robot/event`, `/robot/{agent_id}`
+- **Agent Graph**: 위험도 평가, 전략 선택, LLM 힌트 여부 결정
 - **Policy Engine**: 규칙 엔진 + 상태/프로필/이벤트 기반 의사결정
 - **LLM Client**: llama.cpp 또는 Ollama 연동
-- **State Store**: 최근 상태, 프로필, 이벤트, 실패 횟수 저장
+- **LLM Parser**: 안전한 JSON 액션 파싱
+- **State Store**: 최근 상태, 프로필, 이벤트, trace 저장
 
 ## 실행 API
 ### `POST /observe`
@@ -33,6 +36,9 @@
 
 ### `GET /robot/{agent_id}`
 해당 로봇의 저장된 프로필, 최근 이벤트, 마지막 상태를 조회합니다.
+
+### `GET /robot/{agent_id}/trace`
+해당 로봇의 최신 에이전트 trace를 조회합니다.
 
 ### `GET /health`
 앱/LLM/캐시 상태를 반환합니다.
@@ -52,11 +58,13 @@
 - 역할: healer / tank / dealer / collector / support / scout
 - 성향: aggressive / defensive / balanced / support
 - 선호 스킬 / 금지 스킬
-- 파티 정보
-- 홈 좌표
+- 파티 정보 / 클랜 정보
+- 홈 좌표 / 순찰 포인트
 - 태그 / 노트 / 메타데이터
 - 최근 이벤트
   - 예: `loot_detected`, `danger_zone`, `boss_spawn`, `party_member_down`
+- 전투 상태
+  - `nearby_enemies`, `nearby_allies`, `buffs`, `debuffs`, `aggro_targets`
 
 ## 요청 예시: 상태
 ```json
@@ -68,9 +76,17 @@
     "mp": 20,
     "x": 100,
     "y": 200,
+    "map_id": 4,
+    "heading": 2,
     "target_id": "mob_1",
     "target_distance": 1,
+    "target_hp": 80,
     "is_under_attack": true,
+    "nearby_enemies": 2,
+    "nearby_allies": 1,
+    "safe_zone": false,
+    "can_teleport": true,
+    "weight_percent": 44,
     "cooldowns": {
       "heal": 0,
       "fireball": 5
@@ -78,6 +94,9 @@
     "inventory": {
       "potion": 2
     },
+    "buffs": [],
+    "debuffs": [],
+    "aggro_targets": ["mob_1"],
     "extras": {}
   }
 }
@@ -91,6 +110,8 @@
   "role": "healer",
   "style": "support",
   "party_id": "party_a",
+  "clan_id": "clan_blue",
+  "patrol_points": [{"x": 100, "y": 200}, {"x": 110, "y": 205}],
   "preferred_skills": ["support_heal", "heal"],
   "banned_skills": [],
   "tags": ["raid", "night-shift"],
@@ -138,8 +159,9 @@ AI 서버는 HTTP REST 기준입니다. 어느 언어의 게임 서버든 상태
 3. 전투/파밍/파티 상황 발생 시 `/robot/event` 로 최근 이벤트 적재
 4. `/observe` 호출
 5. 행동 필요 시 `/decide` 호출
-6. 반환 액션 검증
-7. 실제 게임 서버에서 실행
+6. 필요 시 `/robot/{agent_id}/trace` 로 판단 흐름 확인
+7. 반환 액션 검증
+8. 실제 게임 서버에서 실행
 
 ## 로컬 실행
 ```bash
@@ -171,6 +193,7 @@ docker compose up --build
 - 액션 화이트리스트 강제
 - 잘못된 LLM 응답 즉시 폴백
 - 타임아웃 필수
+- 에이전트 trace는 진단용이며 직접 실행 권한이 없음
 - 게임 액션은 AI 서버가 직접 실행하지 않음
 - 실제 액션 실행은 게임 서버가 담당
 
@@ -178,12 +201,13 @@ docker compose up --build
 - 가볍고 안정적으로 게임 서버와 연동되는 AI 브리지 서버를 목표로 합니다.
 - 모든 판단을 LLM에 맡기지 않고, 규칙 엔진과 상태머신을 중심으로 운영 안정성을 확보합니다.
 - 로봇의 역할, 성향, 장비 성격, 최근 이벤트를 흡수하여 더 일관된 행동을 유도합니다.
+- 에이전트 trace를 제공하여 디버깅과 운영 분석을 쉽게 합니다.
 - 코드량보다 단순성, 추적 가능한 로그, 실패 시 폴백을 우선합니다.
 
 ## 다음 확장 포인트
 - Redis 연동 고도화
-- llama.cpp JSON 응답 강제 프롬프트 개선
-- Java / C++ / Python 샘플 클라이언트 추가
+- API Key 인증 추가
+- Java / C++ / Python 샘플 클라이언트 확장
 - GitHub Actions 확장
 - NPC 대화용 보조 LLM 노드 추가
 - 장기 메모리 / 행동 이력 분석 추가
