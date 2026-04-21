@@ -12,6 +12,7 @@ Use one of:
 - robot-specific learning is loaded first
 - shared group learning can supplement preferred or avoided actions
 - merged result is attached to runtime trace
+- feedback can automatically update shared learning when `group_key`, `party_id`, or `role` is supplied in feedback context
 
 ## Recommended use
 - bots in the same party
