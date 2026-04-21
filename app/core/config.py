@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
+    adaptive_preferred_bonus: float = 0.05
+    adaptive_avoid_penalty: float = 0.15
+    learning_reward_decay: float = 0.98
+
     enable_api_key_auth: bool = False
     api_key: str = ""
     allow_batch_requests: bool = True
