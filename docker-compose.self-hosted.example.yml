@@ -1,0 +1,35 @@
+services:
+  aia:
+    build: .
+    container_name: aia
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: AIA
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      LLM_BACKEND: self_hosted
+      LLM_PROVIDER: openai_compatible
+      LLM_BASE_URL: http://llm-server:8001
+      LLM_MODEL: local-game-model
+      LLM_TIMEOUT_SECONDS: 3.0
+      STATE_STORE_MODE: memory
+      ENABLE_API_KEY_AUTH: false
+      ALLOW_BATCH_REQUESTS: true
+      MAX_BATCH_SIZE: 50
+      ENABLE_WEBSOCKET_GATEWAY: true
+    depends_on:
+      - llm-server
+    restart: unless-stopped
+
+  llm-server:
+    image: your-self-hosted-llm-image
+    container_name: llm-server
+    ports:
+      - "8001:8001"
+    environment:
+      MODEL_NAME: local-game-model
+    restart: unless-stopped
+
+# Replace `your-self-hosted-llm-image` with your actual inference server image.
+# The inference server should expose an OpenAI-compatible `/v1/chat/completions` API.
