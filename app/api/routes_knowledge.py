@@ -1,12 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.security import verify_api_key
 from app.models.request_models import RobotEventRequest, RobotProfileRequest
 from app.models.response_models import AgentTraceResponse, RobotEventResponse, RobotKnowledgeResponse, RobotProfileResponse
 from app.services.agent_service import agent_service
 from app.services.state_store import state_store
 
 
-router = APIRouter(prefix="/robot", tags=["robot"])
+router = APIRouter(prefix="/robot", tags=["robot"], dependencies=[Depends(verify_api_key)])
 
 
 @router.post("/profile", response_model=RobotProfileResponse)
