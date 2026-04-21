@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     adaptive_preferred_bonus: float = 0.05
     adaptive_avoid_penalty: float = 0.15
     learning_reward_decay: float = 0.98
+    learning_journal_enabled: bool = True
+    learning_journal_path: str = "./runtime/learning_journal"
+    learning_journal_keep_last: int = 20
 
     enable_api_key_auth: bool = False
     api_key: str = ""
