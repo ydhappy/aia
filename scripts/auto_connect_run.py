@@ -35,6 +35,8 @@ def ensure_env() -> None:
         if "DB_BRIDGE_BACKEND=sqlite" not in text and "DB_BRIDGE_BACKEND=" in text:
             text = text.replace("DB_BRIDGE_BACKEND=mysql", "DB_BRIDGE_BACKEND=sqlite")
             text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
+        if "ENABLE_API_KEY_AUTH=false" not in text and "ENABLE_API_KEY_AUTH=" in text:
+            text = text.replace("ENABLE_API_KEY_AUTH=true", "ENABLE_API_KEY_AUTH=false")
         ENV_FILE.write_text(text, encoding="utf-8")
 
 
@@ -58,10 +60,11 @@ def main() -> None:
     os.environ.setdefault("APP_PORT", "8000")
     os.environ.setdefault("STATE_STORE_MODE", "memory")
     os.environ.setdefault("DB_BRIDGE_BACKEND", "sqlite")
+    os.environ.setdefault("ENABLE_API_KEY_AUTH", "false")
 
     print("[auto-connect-run] bootstrap complete")
     print("[auto-connect-run] AIA will run on 127.0.0.1:8000")
-    print("[auto-connect-run] safe defaults: STATE_STORE_MODE=memory, DB_BRIDGE_BACKEND=sqlite")
+    print("[auto-connect-run] safe defaults: STATE_STORE_MODE=memory, DB_BRIDGE_BACKEND=sqlite, ENABLE_API_KEY_AUTH=false")
     print("[auto-connect-run] if you use MySQL/MariaDB, import sql/aia_robot_schema.sql first")
     run([py, "scripts/run_local_aia.py"])
 
