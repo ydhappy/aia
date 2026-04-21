@@ -3,10 +3,12 @@ from app.graphs.agent_graph import agent_graph
 from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
 from app.models.request_models import DecideRequest, ObserveRequest
 from app.models.response_models import AgentTraceResponse, DecideResponse, ObserveResponse
+from app.services.anomaly_detection_service import anomaly_detection_service
 from app.services.group_learning_service import group_learning_service
 from app.services.growth_service import growth_service
 from app.services.llm_client import llm_client
 from app.services.llm_parser import llm_parser
+from app.services.meta_policy_service import meta_policy_service
 from app.services.policy_engine import policy_engine
 from app.services.runtime_overrides import runtime_overrides
 from app.services.store_factory import store
@@ -41,6 +43,8 @@ class AgentService:
             "profile_hint": trace.get("profile_hint"),
             "runtime_override": trace.get("runtime_override"),
             "growth_state": trace.get("growth_state"),
+            "anomalies": trace.get("anomalies"),
+            "meta_policy": trace.get("meta_policy"),
             "final_source": trace.get("final_source"),
             "final_reason": trace.get("final_reason"),
             "learning_state": trace.get("learning_state"),
@@ -68,8 +72,12 @@ class AgentService:
             recent_events=recent_events,
             learning_state=learning_state,
         )
+        anomalies = anomaly_detection_service.detect(trace, growth_state)
+        meta_policy = meta_policy_service.select_strategy(profile, growth_state, anomalies)
         trace["runtime_override"] = override_info
         trace["growth_state"] = growth_state
+        trace["anomalies"] = anomalies
+        trace["meta_policy"] = meta_policy
         store.save_trace(request.agent_id, self._compact_trace(trace))
 
         if trace.get("llm_hint"):
@@ -87,9 +95,10 @@ class AgentService:
                     store.save_trace(request.agent_id, self._compact_trace(trace))
 
         try:
+            effective_profile = {**profile, **meta_policy}
             decision = policy_engine.decide(
                 request.state,
-                profile=profile,
+                profile=effective_profile,
                 recent_events=recent_events,
                 learning_state=learning_state,
                 runtime_override=override_info,
