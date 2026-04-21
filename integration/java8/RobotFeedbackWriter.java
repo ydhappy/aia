@@ -10,6 +10,11 @@ import java.sql.PreparedStatement;
  * 왜 필요한가:
  * - AIA 학습/성장/실패 분석에 사용됩니다.
  * - 예: 이동 실패가 많으면 안전 모드로 자동 조정 가능
+ *
+ * 초보자 주의:
+ * - 현재 DB에 `robot_feedback` 테이블이 먼저 있어야 합니다.
+ * - `sql/aia_robot_schema.sql`를 먼저 적용하세요.
+ * - JDBC URL / user / password 는 현재 서버 DB 환경에 맞게 바꾸세요.
  */
 public class RobotFeedbackWriter {
     private final String jdbcUrl;
