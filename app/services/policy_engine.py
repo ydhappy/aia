@@ -2,6 +2,7 @@ from app.core.config import settings
 from app.models.request_models import AgentState
 from app.models.response_models import DecideResponse
 from app.policies import ROLE_POLICIES
+from app.services.adaptive_policy import adaptive_policy
 
 
 class PolicyEngine:
@@ -10,11 +11,12 @@ class PolicyEngine:
         state: AgentState,
         profile: dict | None = None,
         recent_events: list[dict] | None = None,
+        learning_state: dict | None = None,
     ) -> DecideResponse:
         profile = profile or {}
         recent_events = recent_events or []
+        learning_state = learning_state or {}
 
-        heal_cd = state.cooldowns.get("heal", 999)
         potion_count = state.inventory.get("potion", 0)
         role = profile.get("role", "custom")
         style = profile.get("style", "balanced")
@@ -25,81 +27,81 @@ class PolicyEngine:
 
         if (state.hp <= settings.default_retreat_hp_threshold or has_danger_event) and not state.safe_zone:
             mode = "teleport" if state.can_teleport else "safe_zone"
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="RETREAT",
                 action_args={"mode": mode, "role": role},
                 confidence=0.99,
                 reason="critical_hp_or_high_severity_event",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         if is_overweight and not state.safe_zone:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="RETREAT",
                 action_args={"mode": "inventory_reset"},
                 confidence=0.87,
                 reason="inventory_weight_high",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         for policy in ROLE_POLICIES:
             if policy.applies(role):
                 decision = policy.decide(state, profile, recent_events)
                 if decision is not None:
-                    return decision
+                    return adaptive_policy.adjust(decision, learning_state)
 
         if state.hp <= settings.default_heal_hp_threshold and potion_count > 0:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="PICKUP",
                 action_args={"item": "potion_buffer"},
                 confidence=0.60,
                 reason="low_hp_and_need_resources",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         if style == "defensive" and state.is_under_attack and state.target_distance is not None and state.target_distance > 1 and not state.safe_zone:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
                 action_args={"mode": "kite", "target_id": state.target_id},
                 confidence=0.84,
                 reason="defensive_style_kiting",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         if state.target_id and state.target_distance is not None and state.target_distance <= 1:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="ATTACK",
                 action_args={"target_id": state.target_id, "style": style},
                 confidence=0.95,
                 reason="target_in_melee_range",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         if state.target_id and state.target_distance is not None and state.target_distance > 1:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
                 action_args={"target_id": state.target_id, "mode": "approach"},
                 confidence=0.85,
                 reason="target_visible_but_not_in_range",
                 source="rule_engine",
-            )
+            ), learning_state)
 
         if patrol_points:
-            return DecideResponse(
+            return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
                 action_args={"mode": "patrol", "points": patrol_points[:3]},
                 confidence=0.70,
                 reason="patrol_route_available",
                 source="rule_engine",
-            )
+            ), learning_state)
 
-        return DecideResponse(
+        return adaptive_policy.adjust(DecideResponse(
             action="IDLE",
             action_args={"role": role},
             confidence=0.80,
             reason="no_target_and_no_urgent_state",
             source="rule_engine",
-        )
+        ), learning_state)
 
 
 policy_engine = PolicyEngine()
