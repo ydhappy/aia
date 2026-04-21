@@ -16,9 +16,18 @@ class AgentService:
 
     def decide(self, request: DecideRequest) -> DecideResponse:
         state_store.increment_decide()
+        profile = state_store.get_profile(request.agent_id)
+        recent_events = state_store.get_recent_events(request.agent_id)
 
         if llm_client.should_use_llm(request.state.model_dump()):
-            llm_result = llm_client.decide(request.state.model_dump())
+            llm_result = llm_client.decide(
+                {
+                    "agent_id": request.agent_id,
+                    "state": request.state.model_dump(),
+                    "profile": profile,
+                    "recent_events": recent_events,
+                }
+            )
             if llm_result:
                 return DecideResponse(
                     action="IDLE",
@@ -29,7 +38,11 @@ class AgentService:
                 )
 
         try:
-            return policy_engine.decide(request.state)
+            return policy_engine.decide(
+                request.state,
+                profile=profile,
+                recent_events=recent_events,
+            )
         except Exception:
             state_store.increment_fallback()
             return DecideResponse(
