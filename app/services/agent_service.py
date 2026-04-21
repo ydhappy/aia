@@ -2,9 +2,11 @@ from app.graphs.agent_graph import agent_graph
 from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
 from app.models.request_models import DecideRequest, ObserveRequest
 from app.models.response_models import AgentTraceResponse, DecideResponse, ObserveResponse
+from app.services.group_learning_service import group_learning_service
 from app.services.llm_client import llm_client
 from app.services.llm_parser import llm_parser
 from app.services.policy_engine import policy_engine
+from app.services.runtime_overrides import runtime_overrides
 from app.services.store_factory import store
 from app.utils.validators import action_validator
 
@@ -30,6 +32,13 @@ class AgentService:
         recent_events = store.get_recent_events(request.agent_id)
         learning_state = store.get_learning_state(request.agent_id)
 
+        group_key = profile.get("party_id") or profile.get("role")
+        if group_key:
+            merged_learning = group_learning_service.merge_group_learning(request.agent_id, group_key)
+            learning_state = {**learning_state, **{k: v for k, v in merged_learning.items() if k in ["preferred_action", "avoid_action"]}}
+
+        override_info = runtime_overrides.get_override(profile, request.state.model_dump())
+
         trace = agent_graph.run(
             agent_id=request.agent_id,
             state=request.state,
@@ -37,6 +46,7 @@ class AgentService:
             recent_events=recent_events,
             learning_state=learning_state,
         )
+        trace["runtime_override"] = override_info
         store.save_trace(request.agent_id, trace)
 
         if trace.get("llm_hint"):
