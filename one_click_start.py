@@ -33,7 +33,9 @@ def ensure_env() -> None:
         if "DB_BRIDGE_BACKEND=sqlite" not in text and "DB_BRIDGE_BACKEND=" in text:
             text = text.replace("DB_BRIDGE_BACKEND=mysql", "DB_BRIDGE_BACKEND=sqlite")
             text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
-            ENV_FILE.write_text(text, encoding="utf-8")
+        if "STATE_STORE_MODE=memory" not in text and "STATE_STORE_MODE=" in text:
+            text = text.replace("STATE_STORE_MODE=redis", "STATE_STORE_MODE=memory")
+        ENV_FILE.write_text(text, encoding="utf-8")
 
 
 def ensure_runtime_dirs() -> None:
@@ -56,10 +58,12 @@ def main() -> None:
     os.environ.setdefault("APP_HOST", "127.0.0.1")
     os.environ.setdefault("APP_PORT", "8000")
     os.environ.setdefault("DB_BRIDGE_BACKEND", "sqlite")
+    os.environ.setdefault("STATE_STORE_MODE", "memory")
 
     print("[one-click] startup summary")
     print("[one-click] mode : local single-host")
     print("[one-click] db   : sqlite (default one-click mode)")
+    print("[one-click] store: memory (safe one-click mode)")
     print("[one-click] host : 127.0.0.1:8000")
     print("[one-click] next : use Java 8 adapter under integration/java8/")
     run([py, "scripts/run_local_aia.py"])
