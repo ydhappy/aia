@@ -12,21 +12,36 @@ class PolicyEngine:
         profile: dict | None = None,
         recent_events: list[dict] | None = None,
         learning_state: dict | None = None,
+        runtime_override: dict | None = None,
     ) -> DecideResponse:
         profile = profile or {}
         recent_events = recent_events or []
         learning_state = learning_state or {}
+        runtime_override = runtime_override or {}
 
+        override = runtime_override.get("override", {}) if isinstance(runtime_override, dict) else {}
         potion_count = state.inventory.get("potion", 0)
-        role = profile.get("role", "custom")
-        style = profile.get("style", "balanced")
-        patrol_points = profile.get("patrol_points", [])
+        role = override.get("role", profile.get("role", "custom"))
+        style = override.get("style", profile.get("style", "balanced"))
+        patrol_points = override.get("patrol_points", profile.get("patrol_points", []))
+        retreat_hp_threshold = int(override.get("retreat_hp_threshold", settings.default_retreat_hp_threshold))
+        forced_action = override.get("forced_action")
+        forced_mode = override.get("forced_mode")
 
         has_danger_event = any(event.get("severity") == "high" for event in recent_events)
         is_overweight = state.weight_percent is not None and state.weight_percent >= 85
 
-        if (state.hp <= settings.default_retreat_hp_threshold or has_danger_event) and not state.safe_zone:
-            mode = "teleport" if state.can_teleport else "safe_zone"
+        if forced_action in {"MOVE", "ATTACK", "USE_SKILL", "RETREAT", "PICKUP", "IDLE"}:
+            return adaptive_policy.adjust(DecideResponse(
+                action=forced_action,
+                action_args={"mode": forced_mode} if forced_mode else {},
+                confidence=0.99,
+                reason="runtime_override_forced_action",
+                source="rule_engine",
+            ), learning_state)
+
+        if (state.hp <= retreat_hp_threshold or has_danger_event) and not state.safe_zone:
+            mode = override.get("retreat_mode") or ("teleport" if state.can_teleport else "safe_zone")
             return adaptive_policy.adjust(DecideResponse(
                 action="RETREAT",
                 action_args={"mode": mode, "role": role},
@@ -62,7 +77,7 @@ class PolicyEngine:
         if style == "defensive" and state.is_under_attack and state.target_distance is not None and state.target_distance > 1 and not state.safe_zone:
             return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
-                action_args={"mode": "kite", "target_id": state.target_id},
+                action_args={"mode": override.get("move_mode", "kite"), "target_id": state.target_id},
                 confidence=0.84,
                 reason="defensive_style_kiting",
                 source="rule_engine",
@@ -80,7 +95,7 @@ class PolicyEngine:
         if state.target_id and state.target_distance is not None and state.target_distance > 1:
             return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
-                action_args={"target_id": state.target_id, "mode": "approach"},
+                action_args={"target_id": state.target_id, "mode": override.get("move_mode", "approach")},
                 confidence=0.85,
                 reason="target_visible_but_not_in_range",
                 source="rule_engine",
@@ -89,7 +104,7 @@ class PolicyEngine:
         if patrol_points:
             return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
-                action_args={"mode": "patrol", "points": patrol_points[:3]},
+                action_args={"mode": override.get("move_mode", "patrol"), "points": patrol_points[:3]},
                 confidence=0.70,
                 reason="patrol_route_available",
                 source="rule_engine",
