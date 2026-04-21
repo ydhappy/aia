@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from app.core.config import settings
 from app.core.security import verify_api_key
 from app.models.orchestration_models import FleetSummaryResponse, FleetSyncRequest, FleetSyncResponse
 from app.services.fleet_service import fleet_service
@@ -21,4 +22,9 @@ def scale_summary(request: FleetSyncRequest) -> FleetSummaryResponse:
 
 @router.post("/recover")
 def scale_recover(request: FleetSyncRequest) -> dict:
-    return {"results": watchdog_service.scan_and_recover(request.agent_ids)}
+    limited = request.agent_ids[: settings.max_scale_recover_agents]
+    return {
+        "requested": len(request.agent_ids),
+        "processed": len(limited),
+        "results": watchdog_service.scan_and_recover(limited),
+    }
