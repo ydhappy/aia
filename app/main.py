@@ -6,13 +6,14 @@ from app.api.routes_batch import router as batch_router
 from app.api.routes_health import router as health_router
 from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_metrics import router as metrics_router
+from app.api.routes_ws import router as ws_router
 from app.core.config import settings
 from app.core.security import ApiKeyError
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     description="Lightweight AI bridge server for game server integration.",
 )
 
@@ -27,6 +28,7 @@ app.include_router(agent_router)
 app.include_router(batch_router)
 app.include_router(metrics_router)
 app.include_router(knowledge_router)
+app.include_router(ws_router)
 
 
 @app.get("/")
