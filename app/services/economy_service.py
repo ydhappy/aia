@@ -21,4 +21,4 @@ class EconomyService:
         return {"phase": "field_operation", "objective": "continue_field_loop"}
 
 
- economy_service = EconomyService()
+economy_service = EconomyService()
