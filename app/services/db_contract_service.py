@@ -34,4 +34,4 @@ class DBContractService:
         }
 
 
- db_contract_service = DBContractService()
+db_contract_service = DBContractService()
