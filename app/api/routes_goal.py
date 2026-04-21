@@ -6,6 +6,7 @@ from app.services.economy_service import economy_service
 from app.services.goal_service import goal_service
 from app.services.growth_service import growth_service
 from app.services.npc_service import npc_service
+from app.services.persona_layer_service import persona_layer_service
 from app.services.state_machine_service import state_machine_service
 from app.services.store_factory import store
 from app.services.talk_service import talk_service
@@ -24,9 +25,11 @@ def goal_state(agent_id: str) -> dict:
     state = state_wrapper.get("state", {}) if isinstance(state_wrapper, dict) else {}
     next_step = automation_service.decide_next_step(agent_id, state).next_step
     growth = growth_service.get_growth_state(agent_id).model_dump()
+    profile = store.get_profile(agent_id) or {}
+    persona = persona_layer_service.build(profile)
     trace = store.get_trace(agent_id) or {}
     anomalies = trace.get("anomalies", {"detected": False, "anomalies": []}) if isinstance(trace, dict) else {"detected": False, "anomalies": []}
-    talk = talk_service.build_talk(goal, growth, anomalies, next_step)
+    talk = talk_service.build_talk(goal, growth, anomalies, next_step, persona)
     return {
         "goal": goal,
         "state_machine": fsm,
@@ -34,5 +37,6 @@ def goal_state(agent_id: str) -> dict:
         "npc": npc,
         "next_step": next_step,
         "growth": growth,
+        "persona": persona,
         "talk": talk,
     }
