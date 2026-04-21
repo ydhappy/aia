@@ -13,13 +13,15 @@ services:
       LLM_BASE_URL: http://llm-server:8001
       LLM_MODEL: local-game-model
       LLM_TIMEOUT_SECONDS: 3.0
-      STATE_STORE_MODE: memory
+      STATE_STORE_MODE: redis
+      REDIS_URL: redis://redis:6379/0
       ENABLE_API_KEY_AUTH: false
       ALLOW_BATCH_REQUESTS: true
       MAX_BATCH_SIZE: 50
       ENABLE_WEBSOCKET_GATEWAY: true
     depends_on:
       - llm-server
+      - redis
     restart: unless-stopped
 
   llm-server:
@@ -29,6 +31,13 @@ services:
       - "8001:8001"
     environment:
       MODEL_NAME: local-game-model
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: aia-redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
 # Replace `your-self-hosted-llm-image` with your actual inference server image.
