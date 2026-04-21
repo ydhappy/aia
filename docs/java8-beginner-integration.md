@@ -14,6 +14,17 @@
 - `integration/java8/RobotFeedbackWriter.java`
 - `integration/java8/DbDecisionPoller.java`
 
+## 인증 관련 가장 중요한 설명
+- `python one_click_start.py` 기준으로는 기본적으로 `ENABLE_API_KEY_AUTH=false` 입니다.
+- 즉, 초보자 테스트 단계에서는 Java 쪽 API 키가 실제로 맞지 않아도 HTTP 호출 자체는 막히지 않습니다.
+- 나중에 운영 환경에서 인증을 켜면, `LocalAiaClient` 생성자에 넣는 `apiKey` 값을 실제 서버 `.env`의 값과 맞춰야 합니다.
+
+## DB 관련 가장 중요한 설명
+- `RobotStateWriter`, `RobotEventWriter`, `RobotFeedbackWriter`를 쓰려면 먼저 `sql/aia_robot_schema.sql`를 DB에 적용해야 합니다.
+- `RobotStateWriter` 예시는 **MySQL / MariaDB 기준**입니다.
+- PostgreSQL을 쓴다면 `REPLACE INTO` 대신 `INSERT ... ON CONFLICT ... DO UPDATE` 형태로 바꿔야 합니다.
+- 즉, 처음에는 one-click 기본값인 sqlite로 AIA를 먼저 띄우고, Java DB 기록기는 MySQL/MariaDB 기준으로 붙이는 것이 가장 쉽습니다.
+
 ## 각 클래스 역할
 ### AiaDecision
 AIA 응답 한 건을 담는 모델입니다.
@@ -49,9 +60,10 @@ DB 중심 혼합형에서 최신 decision action을 읽습니다.
 1. `RobotStateExtractor`의 TODO를 수정
 2. `LocalAiaClient`로 `/health`, `/decide` 호출 확인
 3. `RobotActionExecutor`를 println으로 먼저 확인
-4. `RobotStateWriter`로 상태 저장 확인
-5. `RobotFeedbackWriter`로 결과 저장 확인
-6. 로봇 루프에 위 4개를 연결
+4. DB를 쓸 경우 `sql/aia_robot_schema.sql`를 먼저 적용
+5. `RobotStateWriter`로 상태 저장 확인
+6. `RobotFeedbackWriter`로 결과 저장 확인
+7. 로봇 루프에 위 클래스를 연결
 
 ## 실제 수정이 필요한 부분
 ### 1. RobotStateExtractor
@@ -97,6 +109,9 @@ Java 8 서버에서 `LocalAiaClient`로 `/decide` 호출만 해봅니다.
 응답 action을 `RobotActionExecutor`에서 println으로 출력해봅니다.
 
 ### 4단계
+DB를 쓸 경우 `sql/aia_robot_schema.sql`를 적용한 뒤 `RobotStateWriter`와 `RobotFeedbackWriter`를 테스트합니다.
+
+### 5단계
 정상 확인 후 실제 이동/공격 함수로 교체합니다.
 
 ## 초보자 핵심 팁
