@@ -17,6 +17,7 @@ def robot_sync(request: UnifiedRobotSyncRequest) -> UnifiedRobotSyncResponse:
     profile_result = None
     event_results = []
     observe_result = None
+    decide_result = None
     feedback_result = None
     automation_result = {}
 
@@ -31,6 +32,9 @@ def robot_sync(request: UnifiedRobotSyncRequest) -> UnifiedRobotSyncResponse:
     if request.observe is not None:
         observe_result = agent_service.observe(request.observe)
 
+    if request.decide is not None:
+        decide_result = agent_service.decide(request.decide)
+
     if request.feedback is not None:
         feedback_result = learning_service.submit_feedback(request.feedback)
 
@@ -42,6 +46,7 @@ def robot_sync(request: UnifiedRobotSyncRequest) -> UnifiedRobotSyncResponse:
         profile_result=profile_result,
         event_results=event_results,
         observe_result=observe_result,
+        decide_result=decide_result,
         feedback_result=feedback_result,
         automation_result=automation_result,
     )
