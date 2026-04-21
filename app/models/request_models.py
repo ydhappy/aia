@@ -8,11 +8,22 @@ class AgentState(BaseModel):
     mp: int = Field(ge=0)
     x: int
     y: int
+    map_id: int | None = None
+    heading: int | None = None
     target_id: str | None = None
     target_distance: int | None = Field(default=None, ge=0)
+    target_hp: int | None = Field(default=None, ge=0)
     is_under_attack: bool = False
+    nearby_enemies: int = Field(default=0, ge=0)
+    nearby_allies: int = Field(default=0, ge=0)
+    safe_zone: bool = False
+    can_teleport: bool = False
+    weight_percent: int | None = Field(default=None, ge=0, le=100)
     cooldowns: dict[str, int] = Field(default_factory=dict)
     inventory: dict[str, int] = Field(default_factory=dict)
+    buffs: list[str] = Field(default_factory=list)
+    debuffs: list[str] = Field(default_factory=list)
+    aggro_targets: list[str] = Field(default_factory=list)
     extras: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -38,8 +49,10 @@ class RobotProfileRequest(BaseModel):
     role: RobotRole = "custom"
     style: RobotStyle = "balanced"
     party_id: str | None = None
+    clan_id: str | None = None
     home_x: int | None = None
     home_y: int | None = None
+    patrol_points: list[dict[str, int]] = Field(default_factory=list)
     preferred_skills: list[str] = Field(default_factory=list)
     banned_skills: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
