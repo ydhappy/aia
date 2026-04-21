@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 3.0
     llm_api_key: str = ""
     llm_provider: str = "generic"
+    llm_max_parallel_requests: int = 8
+    llm_disable_for_bulk_scale: bool = True
 
     state_store_mode: str = "memory"
     redis_url: str = "redis://localhost:6379/0"
@@ -23,6 +25,8 @@ class Settings(BaseSettings):
     db_bridge_sqlite_path: str = "./aia_bridge.db"
     db_bridge_postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/aia"
     db_bridge_mysql_dsn: str = "mysql+pymysql://root:root@localhost:3306/aia"
+    db_bridge_poll_limit: int = 500
+    db_bridge_write_batch_size: int = 200
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
@@ -34,6 +38,10 @@ class Settings(BaseSettings):
     api_key: str = ""
     allow_batch_requests: bool = True
     max_batch_size: int = 50
+    max_scale_recover_agents: int = 5000
+    scheduler_cycle_batch_size: int = 250
+    trace_store_enabled: bool = True
+    trace_compact_mode: bool = False
 
     enable_websocket_gateway: bool = True
 
