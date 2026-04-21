@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.graphs.agent_graph import agent_graph
 from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
 from app.models.request_models import DecideRequest, ObserveRequest
@@ -26,6 +27,24 @@ class AgentService:
     def get_trace(self, agent_id: str) -> AgentTraceResponse:
         return AgentTraceResponse(agent_id=agent_id, trace=store.get_trace(agent_id))
 
+    def _compact_trace(self, trace: dict) -> dict:
+        if not settings.trace_store_enabled:
+            return {}
+        if not settings.trace_compact_mode:
+            return trace
+        compact = {
+            "agent_id": trace.get("agent_id"),
+            "risk_score": trace.get("risk_score"),
+            "strategy": trace.get("strategy"),
+            "llm_hint": trace.get("llm_hint"),
+            "profile_hint": trace.get("profile_hint"),
+            "runtime_override": trace.get("runtime_override"),
+            "final_source": trace.get("final_source"),
+            "final_reason": trace.get("final_reason"),
+            "learning_state": trace.get("learning_state"),
+        }
+        return compact
+
     def decide(self, request: DecideRequest) -> DecideResponse:
         store.increment_decide()
         profile = store.get_profile(request.agent_id)
@@ -47,7 +66,7 @@ class AgentService:
             learning_state=learning_state,
         )
         trace["runtime_override"] = override_info
-        store.save_trace(request.agent_id, trace)
+        store.save_trace(request.agent_id, self._compact_trace(trace))
 
         if trace.get("llm_hint"):
             llm_result = llm_client.decide(trace)
@@ -58,10 +77,10 @@ class AgentService:
                     if valid:
                         trace["final_source"] = parsed.source
                         trace["final_reason"] = parsed.reason
-                        store.save_trace(request.agent_id, trace)
+                        store.save_trace(request.agent_id, self._compact_trace(trace))
                         return parsed
                     trace["llm_validation_error"] = reason
-                    store.save_trace(request.agent_id, trace)
+                    store.save_trace(request.agent_id, self._compact_trace(trace))
 
         try:
             decision = policy_engine.decide(
@@ -77,7 +96,7 @@ class AgentService:
                 trace["final_reason"] = decision.reason
                 trace["learning_preferred_action"] = learning_state.get("preferred_action")
                 trace["learning_avoid_action"] = learning_state.get("avoid_action")
-                store.save_trace(request.agent_id, trace)
+                store.save_trace(request.agent_id, self._compact_trace(trace))
                 return decision
 
             store.increment_fallback()
@@ -90,7 +109,7 @@ class AgentService:
             )
             trace["final_source"] = fallback.source
             trace["final_reason"] = fallback.reason
-            store.save_trace(request.agent_id, trace)
+            store.save_trace(request.agent_id, self._compact_trace(trace))
             return fallback
         except Exception:
             store.increment_fallback()
@@ -103,7 +122,7 @@ class AgentService:
             )
             trace["final_source"] = fallback.source
             trace["final_reason"] = fallback.reason
-            store.save_trace(request.agent_id, trace)
+            store.save_trace(request.agent_id, self._compact_trace(trace))
             return fallback
 
     def decide_batch(self, requests: list[DecideRequest]) -> BatchDecideResponse:
