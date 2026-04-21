@@ -17,7 +17,7 @@ class LLMClient:
     def health(self) -> str:
         if self.backend == "none":
             return "disabled"
-        if self.backend == "hosted":
+        if self.backend in {"hosted", "self_hosted"}:
             return f"configured:{self.provider}"
         return "configured"
 
@@ -84,10 +84,7 @@ class LLMClient:
                     data = response.json()
                     return {"raw": data.get("response", "")}
 
-                if self.backend == "llama.cpp":
-                    return self._openai_compatible_request(client, prompt)
-
-                if self.backend == "hosted":
+                if self.backend in {"llama.cpp", "hosted", "self_hosted"}:
                     return self._openai_compatible_request(client, prompt)
         except Exception:
             return None
