@@ -25,6 +25,18 @@ def python_in_venv() -> str:
     return str(VENV_DIR / "bin" / "python")
 
 
+def normalize_env_file() -> None:
+    if not ENV_FILE.exists():
+        return
+    text = ENV_FILE.read_text(encoding="utf-8")
+    if "STATE_STORE_MODE=memory" not in text and "STATE_STORE_MODE=" in text:
+        text = text.replace("STATE_STORE_MODE=redis", "STATE_STORE_MODE=memory")
+    if "DB_BRIDGE_BACKEND=sqlite" not in text and "DB_BRIDGE_BACKEND=" in text:
+        text = text.replace("DB_BRIDGE_BACKEND=mysql", "DB_BRIDGE_BACKEND=sqlite")
+        text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
+    ENV_FILE.write_text(text, encoding="utf-8")
+
+
 def main() -> None:
     if not VENV_DIR.exists():
         run([sys.executable, "-m", "venv", str(VENV_DIR)])
@@ -36,12 +48,17 @@ def main() -> None:
     if ENV_EXAMPLE.exists() and not ENV_FILE.exists():
         shutil.copyfile(ENV_EXAMPLE, ENV_FILE)
 
+    normalize_env_file()
+
     for target in RUNTIME_DIRS:
         target.mkdir(parents=True, exist_ok=True)
 
     print("[bootstrap] completed")
     print(f"[bootstrap] venv: {VENV_DIR}")
     print(f"[bootstrap] env : {ENV_FILE}")
+    print("[bootstrap] safe defaults:")
+    print("  STATE_STORE_MODE=memory")
+    print("  DB_BRIDGE_BACKEND=sqlite")
     print("[bootstrap] next:")
     print(f"  {py} scripts/run_local_aia.py")
 
