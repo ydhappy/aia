@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.models.response_models import DecideResponse
 
 
@@ -8,11 +9,11 @@ class AdaptivePolicy:
         avoid_action = learning_state.get("avoid_action")
 
         if preferred_action and decision.action == preferred_action:
-            decision.confidence = min(1.0, decision.confidence + 0.05)
+            decision.confidence = min(1.0, decision.confidence + settings.adaptive_preferred_bonus)
             decision.reason = f"{decision.reason}|preferred_action_bias"
 
         if avoid_action and decision.action == avoid_action:
-            decision.confidence = max(0.05, decision.confidence - 0.15)
+            decision.confidence = max(0.05, decision.confidence - settings.adaptive_avoid_penalty)
             decision.reason = f"{decision.reason}|avoid_action_penalty"
 
         return decision
