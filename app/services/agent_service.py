@@ -58,6 +58,7 @@ class AgentService:
                 request.state,
                 profile=profile,
                 recent_events=recent_events,
+                learning_state=learning_state,
             )
             valid, reason = action_validator.validate(decision, request.state)
             if valid:
