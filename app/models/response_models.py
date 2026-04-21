@@ -54,3 +54,8 @@ class RobotKnowledgeResponse(BaseModel):
     profile: dict[str, Any] = Field(default_factory=dict)
     recent_events: list[dict[str, Any]] = Field(default_factory=list)
     last_state: dict[str, Any] | None = None
+
+
+class AgentTraceResponse(BaseModel):
+    agent_id: str
+    trace: dict[str, Any] = Field(default_factory=dict)
