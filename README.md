@@ -1,27 +1,38 @@
 # AIA - Lightweight Game AI Bridge Server
 
-경량 LLM/AI 에이전트 서버 예제입니다. 기존 **Java 8 게임 서버**와 안전하게 연동하는 것을 목표로 하며, 게임 서버는 상태를 전달하고 AI 서버는 **허용된 액션 하나만 추천**합니다.
+경량 LLM/AI 에이전트 서버 예제입니다. 특정 언어에 종속되지 않고 **Java 8 / Java 17 / C++ / C# / Python** 등 다양한 게임 서버와 연동할 수 있도록 설계했습니다. 게임 서버는 상태와 로봇 관련 정보를 전달하고, AI 서버는 **허용된 액션 하나만 추천**합니다.
 
 ## 목표
-- 기존 Java 8 서버 유지
+- 기존 게임 서버 유지
 - AI 서버는 별도 프로세스로 분리
 - 경량/저지연 우선
 - 규칙 엔진 우선, LLM은 보조 판단만 수행
 - 장애 시 즉시 폴백
+- 로봇 관련 정보 흡수 및 재사용
 
 ## 핵심 구조
-- **Java 8 Game Server**: 상태 수집, 실제 액션 실행, 검증
+- **Game Server**: 상태 수집, 실제 액션 실행, 검증
 - **FastAPI AI Bridge**: `/observe`, `/decide`, `/health`, `/metrics`
-- **Policy Engine**: 규칙 엔진 + 상태 기반 의사결정
+- **Robot Knowledge API**: `/robot/profile`, `/robot/event`, `/robot/{agent_id}`
+- **Policy Engine**: 규칙 엔진 + 상태/프로필/이벤트 기반 의사결정
 - **LLM Client**: llama.cpp 또는 Ollama 연동
-- **State Store**: 최근 상태, 마지막 행동, 실패 횟수 저장
+- **State Store**: 최근 상태, 프로필, 이벤트, 실패 횟수 저장
 
 ## 실행 API
 ### `POST /observe`
 상태 적재 전용입니다.
 
 ### `POST /decide`
-현재 상태를 기반으로 허용 액션 하나를 반환합니다.
+현재 상태와 저장된 로봇 지식을 기반으로 허용 액션 하나를 반환합니다.
+
+### `POST /robot/profile`
+로봇 프로필을 저장합니다.
+
+### `POST /robot/event`
+로봇의 최근 이벤트를 저장합니다.
+
+### `GET /robot/{agent_id}`
+해당 로봇의 저장된 프로필, 최근 이벤트, 마지막 상태를 조회합니다.
 
 ### `GET /health`
 앱/LLM/캐시 상태를 반환합니다.
@@ -37,7 +48,17 @@
 - `PICKUP`
 - `IDLE`
 
-## 요청 예시
+## 로봇 지식 흡수 범위
+- 역할: healer / tank / dealer / collector / support / scout
+- 성향: aggressive / defensive / balanced / support
+- 선호 스킬 / 금지 스킬
+- 파티 정보
+- 홈 좌표
+- 태그 / 노트 / 메타데이터
+- 최근 이벤트
+  - 예: `loot_detected`, `danger_zone`, `boss_spawn`, `party_member_down`
+
+## 요청 예시: 상태
 ```json
 {
   "agent_id": "bot_001",
@@ -56,7 +77,40 @@
     },
     "inventory": {
       "potion": 2
-    }
+    },
+    "extras": {}
+  }
+}
+```
+
+## 요청 예시: 로봇 프로필
+```json
+{
+  "agent_id": "bot_001",
+  "name": "PriestAlpha",
+  "role": "healer",
+  "style": "support",
+  "party_id": "party_a",
+  "preferred_skills": ["support_heal", "heal"],
+  "banned_skills": [],
+  "tags": ["raid", "night-shift"],
+  "notes": ["prioritize party sustain"],
+  "metadata": {
+    "server_group": "main"
+  }
+}
+```
+
+## 요청 예시: 로봇 이벤트
+```json
+{
+  "agent_id": "bot_001",
+  "tick": 102,
+  "event_type": "loot_detected",
+  "severity": "low",
+  "message": "rare item on floor",
+  "data": {
+    "item_id": "rare_sword"
   }
 }
 ```
@@ -75,21 +129,17 @@
 }
 ```
 
-## Java 8 연동 방식
-AI 서버는 HTTP REST 기준입니다. Java 8 서버에서 상태를 JSON으로 보내고, AI 응답을 파싱한 후 **서버 측 검증**을 거쳐 실제 행동을 실행합니다.
+## 연동 방식
+AI 서버는 HTTP REST 기준입니다. 어느 언어의 게임 서버든 상태를 JSON으로 보내고, AI 응답을 파싱한 후 **서버 측 검증**을 거쳐 실제 행동을 실행합니다.
 
-### Java 8 권장 연동 순서
+### 권장 연동 순서
 1. 게임 상태 수집
-2. `/observe` 호출
-3. 행동 필요 시 `/decide` 호출
-4. 반환 액션 검증
-5. 실제 게임 서버에서 실행
-
-### Java 8 예시 흐름
-- 저HP + heal 쿨다운 0 → `USE_SKILL(heal)`
-- 근접 타겟 존재 → `ATTACK`
-- 타겟 없음 → `IDLE`
-- 위험 상태 → `RETREAT`
+2. 필요 시 `/robot/profile` 로 로봇 기본 정보 저장
+3. 전투/파밍/파티 상황 발생 시 `/robot/event` 로 최근 이벤트 적재
+4. `/observe` 호출
+5. 행동 필요 시 `/decide` 호출
+6. 반환 액션 검증
+7. 실제 게임 서버에서 실행
 
 ## 로컬 실행
 ```bash
@@ -122,16 +172,18 @@ docker compose up --build
 - 잘못된 LLM 응답 즉시 폴백
 - 타임아웃 필수
 - 게임 액션은 AI 서버가 직접 실행하지 않음
-- 실제 액션 실행은 Java 8 서버가 담당
+- 실제 액션 실행은 게임 서버가 담당
 
 ## 토크 / 멘트
 - 가볍고 안정적으로 게임 서버와 연동되는 AI 브리지 서버를 목표로 합니다.
 - 모든 판단을 LLM에 맡기지 않고, 규칙 엔진과 상태머신을 중심으로 운영 안정성을 확보합니다.
+- 로봇의 역할, 성향, 장비 성격, 최근 이벤트를 흡수하여 더 일관된 행동을 유도합니다.
 - 코드량보다 단순성, 추적 가능한 로그, 실패 시 폴백을 우선합니다.
 
 ## 다음 확장 포인트
 - Redis 연동 고도화
 - llama.cpp JSON 응답 강제 프롬프트 개선
-- Java 8 샘플 클라이언트 추가
+- Java / C++ / Python 샘플 클라이언트 추가
 - GitHub Actions 확장
 - NPC 대화용 보조 LLM 노드 추가
+- 장기 메모리 / 행동 이력 분석 추가
