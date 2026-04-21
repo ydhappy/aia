@@ -1,5 +1,7 @@
+from app.core.config import settings
 from app.models.request_models import RobotFeedbackRequest
 from app.models.response_models import RobotFeedbackResponse, RobotLearningStateResponse
+from app.services.group_learning_service import group_learning_service
 from app.services.store_factory import store
 
 
@@ -48,6 +50,11 @@ class LearningService:
         }
 
         store.save_learning_state(request.agent_id, current)
+
+        group_key = request.context.get("group_key") or request.context.get("party_id") or request.context.get("role")
+        if group_key:
+            group_learning_service.update_group_learning(str(group_key), request.action, request.reward)
+
         return RobotFeedbackResponse(agent_id=request.agent_id)
 
     def get_learning_state(self, agent_id: str) -> RobotLearningStateResponse:
@@ -58,7 +65,7 @@ class LearningService:
 
     def _apply_decay(self, action_stats: dict) -> None:
         for stat in action_stats.values():
-            stat["reward_sum"] = float(stat.get("reward_sum", 0.0)) * 0.98
+            stat["reward_sum"] = float(stat.get("reward_sum", 0.0)) * settings.learning_reward_decay
 
     def _preferred_action(self, action_stats: dict) -> str | None:
         best_action = None
