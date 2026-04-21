@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.core.security import verify_api_key
 from app.models.dashboard_models import AgentFilterResult, DashboardCountsResponse, ShardAssignmentResponse
 from app.services.dashboard_service import dashboard_service
+from app.services.shard_balancer_service import shard_balancer_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
 
@@ -23,6 +24,11 @@ def filter_agents(agent_ids: list[str], require_tasks: bool = False, require_lea
 @router.post("/shards", response_model=list[ShardAssignmentResponse])
 def shard_assign(agent_ids: list[str], shard_count: int = 1) -> list[ShardAssignmentResponse]:
     return dashboard_service.shard_assign(agent_ids, shard_count)
+
+
+@router.post("/shards-weighted")
+def shard_assign_weighted(agent_ids: list[str], shard_count: int = 1) -> list[dict]:
+    return shard_balancer_service.weighted_assign(agent_ids, shard_count)
 
 
 @router.get("/world-profile/{world_id}")
