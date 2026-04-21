@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     db_bridge_backend: str = "sqlite"
     db_bridge_sqlite_path: str = "./aia_bridge.db"
     db_bridge_postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/aia"
+    db_bridge_mysql_dsn: str = "mysql+pymysql://root:root@localhost:3306/aia"
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
