@@ -80,6 +80,7 @@ class DBBridgeService:
         self.sqlite_path = Path(settings.db_bridge_sqlite_path)
         self.postgres_dsn = settings.db_bridge_postgres_dsn
         self.mysql_dsn = settings.db_bridge_mysql_dsn
+        self.poll_limit = max(1, settings.db_bridge_poll_limit)
         if self.backend == "sqlite":
             self._init_sqlite_schema()
         elif self.backend == "postgresql":
@@ -145,56 +146,59 @@ class DBBridgeService:
                     cur.execute(stmt)
 
     def poll_states(self) -> list[dict]:
+        limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT 500").fetchall()
+                rows = conn.execute(f"SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
     def poll_events(self) -> list[dict]:
+        limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT 500").fetchall()
+                rows = conn.execute(f"SELECT * FROM robot_event ORDER BY id DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
     def poll_feedback(self) -> list[dict]:
+        limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT 500").fetchall()
+                rows = conn.execute(f"SELECT * FROM robot_feedback ORDER BY id DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT 500")
+                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
