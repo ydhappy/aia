@@ -1,53 +1,47 @@
 from __future__ import annotations
 
-import ctypes
-from pathlib import Path
 from typing import Any
 
+import httpx
 
-class DLLBridge:
-    def __init__(self, dll_path: str | None = None) -> None:
-        self.dll_path = Path(dll_path).expanduser().resolve() if dll_path else None
-        self.lib = None
-        if self.dll_path and self.dll_path.exists():
-            self.lib = ctypes.WinDLL(str(self.dll_path))
+
+class RuntimeBridge:
+    def __init__(self, base_url: str = "http://127.0.0.1:8000", api_key: str = "change-me") -> None:
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
 
     def is_loaded(self) -> bool:
-        return self.lib is not None
+        return True
 
     def call_bool(self, func_name: str, *args: Any) -> bool:
-        if self.lib is None:
-            return False
-        func = getattr(self.lib, func_name)
-        func.restype = ctypes.c_int
-        converted = [self._convert_arg(arg) for arg in args]
-        return bool(func(*converted))
+        result = self.call_json(func_name, *args)
+        return bool(result.get("ok", False)) if isinstance(result, dict) else bool(result)
 
     def call_int(self, func_name: str, *args: Any) -> int:
-        if self.lib is None:
-            return -1
-        func = getattr(self.lib, func_name)
-        func.restype = ctypes.c_int
-        converted = [self._convert_arg(arg) for arg in args]
-        return int(func(*converted))
+        result = self.call_json(func_name, *args)
+        if isinstance(result, dict):
+            value = result.get("value", -1)
+            return int(value) if isinstance(value, (int, float, str)) else -1
+        return int(result) if isinstance(result, (int, float, str)) else -1
 
     def call_str(self, func_name: str, *args: Any) -> str:
-        if self.lib is None:
-            return ""
-        func = getattr(self.lib, func_name)
-        func.restype = ctypes.c_char_p
-        converted = [self._convert_arg(arg) for arg in args]
-        result = func(*converted)
-        return result.decode("utf-8", errors="ignore") if result else ""
+        result = self.call_json(func_name, *args)
+        if isinstance(result, dict):
+            return str(result.get("value", ""))
+        return str(result)
 
-    def _convert_arg(self, value: Any) -> Any:
-        if isinstance(value, str):
-            return ctypes.c_char_p(value.encode("utf-8"))
-        if isinstance(value, bool):
-            return ctypes.c_int(1 if value else 0)
-        if isinstance(value, int):
-            return ctypes.c_int(value)
-        return value
+    def call_json(self, func_name: str, *args: Any) -> dict:
+        payload = {"function": func_name, "args": list(args)}
+        headers = {"X-API-Key": self.api_key, "Content-Type": "application/json"}
+        with httpx.Client(timeout=5.0) as client:
+            response = client.post(f"{self.base_url}/bridge/runtime-call", headers=headers, json=payload)
+            if response.status_code >= 400:
+                return {"ok": False, "value": None, "error": response.text}
+            try:
+                return response.json()
+            except Exception:
+                return {"ok": False, "value": None, "error": "invalid_json"}
 
 
-dll_bridge = DLLBridge()
+# Backward-compatible symbol name retained for migration safety.
+dll_bridge = RuntimeBridge()
