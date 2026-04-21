@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 3.0
 
     state_store_mode: str = "memory"
+    redis_url: str = "redis://localhost:6379/0"
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     api_key: str = ""
     allow_batch_requests: bool = True
     max_batch_size: int = 50
+
+    enable_websocket_gateway: bool = True
 
 
 settings = Settings()
