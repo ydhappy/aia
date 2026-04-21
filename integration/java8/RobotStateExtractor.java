@@ -33,7 +33,7 @@ public class RobotStateExtractor {
 
     public String toDecideJson(RobotSnapshot s) {
         return "{"
-                + "\"agent_id\":\"" + esc(s.agentId) + "\"," 
+                + "\"agent_id\":\"" + esc(s.agentId) + "\","
                 + "\"tick\":" + s.tick + ","
                 + "\"state\":{"
                 + "\"hp\":" + s.hp + ","
