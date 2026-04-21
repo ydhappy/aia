@@ -19,5 +19,10 @@ class Settings(BaseSettings):
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
+    enable_api_key_auth: bool = False
+    api_key: str = ""
+    allow_batch_requests: bool = True
+    max_batch_size: int = 50
+
 
 settings = Settings()
