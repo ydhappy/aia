@@ -33,3 +33,24 @@ class MetricsResponse(BaseModel):
     total_observe_requests: int
     total_decide_requests: int
     total_fallbacks: int
+    total_profiles_saved: int
+    total_events_saved: int
+
+
+class RobotProfileResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot profile stored"
+
+
+class RobotEventResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot event stored"
+
+
+class RobotKnowledgeResponse(BaseModel):
+    agent_id: str
+    profile: dict[str, Any] = Field(default_factory=dict)
+    recent_events: list[dict[str, Any]] = Field(default_factory=list)
+    last_state: dict[str, Any] | None = None
