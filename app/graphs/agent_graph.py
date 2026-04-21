@@ -11,14 +11,16 @@ class AgentGraph:
         state: AgentState,
         profile: dict[str, Any] | None = None,
         recent_events: list[dict[str, Any]] | None = None,
+        learning_state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         profile = profile or {}
         recent_events = recent_events or []
+        learning_state = learning_state or {}
 
         risk_score = self._evaluate_risk(state, recent_events)
         strategy = self._choose_strategy(state, profile, risk_score)
         llm_hint = self._should_request_llm_hint(state, profile, recent_events, risk_score)
-        profile_hint = build_profile_hint(state, profile)
+        profile_hint = build_profile_hint(state, profile, learning_state)
 
         return {
             "agent_id": agent_id,
@@ -26,6 +28,7 @@ class AgentGraph:
             "strategy": strategy,
             "llm_hint": llm_hint,
             "profile_hint": profile_hint,
+            "learning_state": learning_state,
             "profile": profile,
             "recent_events": recent_events,
             "state": state.model_dump(),
