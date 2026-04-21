@@ -81,6 +81,7 @@ class DBBridgeService:
         self.postgres_dsn = settings.db_bridge_postgres_dsn
         self.mysql_dsn = settings.db_bridge_mysql_dsn
         self.poll_limit = max(1, settings.db_bridge_poll_limit)
+        self.write_batch_size = max(1, settings.db_bridge_write_batch_size)
         if self.backend == "sqlite":
             self._init_sqlite_schema()
         elif self.backend == "postgresql":
@@ -202,41 +203,69 @@ class DBBridgeService:
                     return list(cur.fetchall())
         return []
 
+    def _decision_values(self, rows: list[dict]) -> list[tuple]:
+        limited = rows[: self.write_batch_size]
+        return [(
+            row.get("agent_id"),
+            row.get("tick"),
+            row.get("action"),
+            json.dumps(row.get("action_args", {})),
+            row.get("confidence"),
+            row.get("source"),
+            row.get("reason"),
+        ) for row in limited]
+
+    def _trace_values(self, rows: list[dict]) -> list[tuple]:
+        limited = rows[: self.write_batch_size]
+        return [(
+            row.get("agent_id"),
+            row.get("tick"),
+            json.dumps(row.get("trace", {})),
+        ) for row in limited]
+
     def write_decision(self, decision_row: dict) -> dict:
-        if self.backend == "sqlite":
-            with self._connect() as conn:
-                conn.execute("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (?, ?, ?, ?, ?, ?, ?)", (decision_row.get("agent_id"), decision_row.get("tick"), decision_row.get("action"), json.dumps(decision_row.get("action_args", {})), decision_row.get("confidence"), decision_row.get("source"), decision_row.get("reason")))
-            return {"written": True, "row": decision_row}
-        if self.backend == "postgresql" and psycopg is not None:
-            with self._pg_connect() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", (decision_row.get("agent_id"), decision_row.get("tick"), decision_row.get("action"), json.dumps(decision_row.get("action_args", {})), decision_row.get("confidence"), decision_row.get("source"), decision_row.get("reason")))
-                conn.commit()
-            return {"written": True, "row": decision_row}
-        if self.backend == "mysql" and pymysql is not None:
-            with self._mysql_connect() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", (decision_row.get("agent_id"), decision_row.get("tick"), decision_row.get("action"), json.dumps(decision_row.get("action_args", {})), decision_row.get("confidence"), decision_row.get("source"), decision_row.get("reason")))
-            return {"written": True, "row": decision_row}
-        return {"written": False, "reason": "unsupported_backend", "row": decision_row}
+        return self.write_decisions_batch([decision_row])
 
     def write_trace_summary(self, trace_row: dict) -> dict:
+        return self.write_traces_batch([trace_row])
+
+    def write_decisions_batch(self, rows: list[dict]) -> dict:
+        values = self._decision_values(rows)
         if self.backend == "sqlite":
             with self._connect() as conn:
-                conn.execute("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (?, ?, ?)", (trace_row.get("agent_id"), trace_row.get("tick"), json.dumps(trace_row.get("trace", {}))))
-            return {"written": True, "row": trace_row}
+                conn.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (?, ?, ?, ?, ?, ?, ?)", values)
+            return {"written": True, "count": len(values)}
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", (trace_row.get("agent_id"), trace_row.get("tick"), json.dumps(trace_row.get("trace", {}))))
+                    cur.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
                 conn.commit()
-            return {"written": True, "row": trace_row}
+            return {"written": True, "count": len(values)}
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", (trace_row.get("agent_id"), trace_row.get("tick"), json.dumps(trace_row.get("trace", {}))))
-            return {"written": True, "row": trace_row}
-        return {"written": False, "reason": "unsupported_backend", "row": trace_row}
+                    cur.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
+            return {"written": True, "count": len(values)}
+        return {"written": False, "reason": "unsupported_backend", "count": 0}
+
+    def write_traces_batch(self, rows: list[dict]) -> dict:
+        values = self._trace_values(rows)
+        if self.backend == "sqlite":
+            with self._connect() as conn:
+                conn.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (?, ?, ?)", values)
+            return {"written": True, "count": len(values)}
+        if self.backend == "postgresql" and psycopg is not None:
+            with self._pg_connect() as conn:
+                with conn.cursor() as cur:
+                    cur.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
+                conn.commit()
+            return {"written": True, "count": len(values)}
+        if self.backend == "mysql" and pymysql is not None:
+            with self._mysql_connect() as conn:
+                with conn.cursor() as cur:
+                    cur.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
+            return {"written": True, "count": len(values)}
+        return {"written": False, "reason": "unsupported_backend", "count": 0}
 
 
 db_bridge_service = DBBridgeService()
