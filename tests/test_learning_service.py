@@ -1,5 +1,6 @@
 from app.models.request_models import RobotFeedbackRequest
 from app.services.learning_service import learning_service
+from app.services.store_factory import store
 
 
 def test_learning_feedback_updates_state() -> None:
@@ -42,3 +43,17 @@ def test_learning_feedback_tracks_map_preferences() -> None:
     learning_service.submit_feedback(req)
     state = learning_service.get_learning_state("bot_test_learning3")
     assert state.learning_state["preferred_action_by_map"]["99"] == "MOVE"
+
+
+def test_learning_feedback_updates_group_learning() -> None:
+    req = RobotFeedbackRequest(
+        agent_id="bot_test_learning4",
+        tick=1,
+        action="USE_SKILL",
+        reward=1.5,
+        outcome="success",
+        context={"group_key": "raid_alpha"},
+    )
+    learning_service.submit_feedback(req)
+    group_state = store.get_learning_state("group::raid_alpha")
+    assert group_state["preferred_action"] == "USE_SKILL"
