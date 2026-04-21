@@ -29,6 +29,10 @@ python one_click_start.py
 - `runtime/` 및 `runtime/learning_journal/` 생성
 - 기본 one-click 모드에서는 `sqlite` 기준으로 AIA 실행
 - AIA를 `127.0.0.1:8000` 에서 실행
+- 초보자용 안전 기본값 적용
+  - `STATE_STORE_MODE=memory`
+  - `DB_BRIDGE_BACKEND=sqlite`
+  - `ENABLE_API_KEY_AUTH=false`
 
 이 모드는 **초기 구동 / 테스트 / 단일 장비 분리 실행**에 가장 적합합니다.
 실운영에서 MySQL/PostgreSQL을 쓸 경우 `.env`만 조정하면 됩니다.
