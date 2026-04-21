@@ -3,6 +3,7 @@ from app.models.response_models import DecideResponse, ObserveResponse
 from app.services.llm_client import llm_client
 from app.services.policy_engine import policy_engine
 from app.services.state_store import state_store
+from app.utils.validators import action_validator
 
 
 class AgentService:
@@ -29,19 +30,34 @@ class AgentService:
                 }
             )
             if llm_result:
-                return DecideResponse(
+                decision = DecideResponse(
                     action="IDLE",
                     action_args={},
                     confidence=0.50,
                     reason="llm_response_received_but_rule_safe_mode_enabled",
                     source="llm",
                 )
+                valid, reason = action_validator.validate(decision, request.state)
+                if valid:
+                    return decision
 
         try:
-            return policy_engine.decide(
+            decision = policy_engine.decide(
                 request.state,
                 profile=profile,
                 recent_events=recent_events,
+            )
+            valid, reason = action_validator.validate(decision, request.state)
+            if valid:
+                return decision
+
+            state_store.increment_fallback()
+            return DecideResponse(
+                action="IDLE",
+                action_args={},
+                confidence=0.20,
+                reason=f"fallback_due_to_invalid_decision:{reason}",
+                source="fallback",
             )
         except Exception:
             state_store.increment_fallback()
