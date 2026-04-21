@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     state_store_mode: str = "memory"
     redis_url: str = "redis://localhost:6379/0"
+    db_bridge_backend: str = "sqlite"
+    db_bridge_sqlite_path: str = "./aia_bridge.db"
     default_retreat_hp_threshold: int = 30
     default_heal_hp_threshold: int = 50
 
