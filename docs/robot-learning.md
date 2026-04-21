@@ -30,7 +30,10 @@ Examples:
 - action-level reward accumulation
 - preferred action extraction
 - avoid action extraction
+- map-aware action preference extraction
+- reward decay for older history
 - learning state attached to trace and profile hints
+- adaptive confidence bias in policy decisions
 
 ## Important note
 This is an online adaptation layer, not full reinforcement learning training. It is designed for immediate operational integration.
