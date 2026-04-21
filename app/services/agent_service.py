@@ -69,6 +69,7 @@ class AgentService:
                 profile=profile,
                 recent_events=recent_events,
                 learning_state=learning_state,
+                runtime_override=override_info,
             )
             valid, reason = action_validator.validate(decision, request.state)
             if valid:
