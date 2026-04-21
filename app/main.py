@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.routes_admin import router as admin_router
 from app.api.routes_agent import router as agent_router
 from app.api.routes_automation import router as automation_router
 from app.api.routes_batch import router as batch_router
@@ -15,7 +16,7 @@ from app.core.security import ApiKeyError
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.6.0",
+    version="0.7.0",
     description="Lightweight AI bridge server for game server integration.",
 )
 
@@ -27,6 +28,7 @@ async def api_key_error_handler(request: Request, exc: ApiKeyError) -> JSONRespo
 
 app.include_router(health_router)
 app.include_router(agent_router)
+app.include_router(admin_router)
 app.include_router(automation_router)
 app.include_router(batch_router)
 app.include_router(metrics_router)
