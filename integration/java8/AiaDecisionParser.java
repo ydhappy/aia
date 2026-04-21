@@ -9,6 +9,7 @@ package integration.java8;
  * - 더 안정적으로 쓰려면 나중에 Jackson/Gson으로 교체해도 됩니다.
  */
 public class AiaDecisionParser {
+    private static final String EMPTY_JSON_OBJECT = "{}";
 
     public AiaDecision parse(String json) {
         if (json == null || json.trim().isEmpty()) {
@@ -19,13 +20,13 @@ public class AiaDecisionParser {
         String reason = readString(json, "reason", "missing_reason");
         String source = readString(json, "source", "unknown");
         double confidence = readDouble(json, "confidence", 0.0d);
-        String actionArgsJson = readObject(json, "action_args", "{}");
+        String actionArgsJson = readObject(json, "action_args", EMPTY_JSON_OBJECT);
 
         return new AiaDecision(action, actionArgsJson, confidence, reason, source);
     }
 
     public AiaDecision fallback(String reason) {
-        return new AiaDecision("IDLE", "{}", 0.0d, reason, "java_fallback");
+        return new AiaDecision("IDLE", EMPTY_JSON_OBJECT, 0.0d, reason, "java_fallback");
     }
 
     private String readString(String json, String key, String defaultValue) {
@@ -91,8 +92,12 @@ public class AiaDecisionParser {
         int depth = 0;
         for (int i = braceStart; i < json.length(); i++) {
             char c = json.charAt(i);
-            if (c == '{') depth++;
-            if (c == '}') depth--;
+            if (c == '{') {
+                depth++;
+            }
+            if (c == '}') {
+                depth--;
+            }
             if (depth == 0) {
                 return json.substring(braceStart, i + 1);
             }
