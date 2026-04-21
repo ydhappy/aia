@@ -7,6 +7,7 @@ class InMemoryStateStore:
         self._states: dict[str, dict[str, Any]] = {}
         self._profiles: dict[str, dict[str, Any]] = {}
         self._events: dict[str, list[dict[str, Any]]] = {}
+        self._traces: dict[str, dict[str, Any]] = {}
         self._metrics = defaultdict(int)
 
     def save_state(self, agent_id: str, tick: int, state: dict[str, Any]) -> None:
@@ -34,6 +35,12 @@ class InMemoryStateStore:
 
     def get_recent_events(self, agent_id: str, limit: int = 10) -> list[dict[str, Any]]:
         return self._events.get(agent_id, [])[-limit:]
+
+    def save_trace(self, agent_id: str, trace: dict[str, Any]) -> None:
+        self._traces[agent_id] = trace
+
+    def get_trace(self, agent_id: str) -> dict[str, Any]:
+        return self._traces.get(agent_id, {})
 
     def increment_decide(self) -> None:
         self._metrics["total_decide_requests"] += 1
