@@ -1,0 +1,9 @@
+{
+  "world_id": "default",
+  "defaults": {
+    "retreat_hp_threshold": 30,
+    "style": "balanced",
+    "move_mode": "approach"
+  },
+  "maps": {}
+}
