@@ -1,4 +1,5 @@
 from app.services.growth_service import growth_service
+from app.services.learning_journal_service import learning_journal_service
 from app.services.store_factory import store
 
 
@@ -39,6 +40,7 @@ class AutonomousGrowthService:
         current["stage"] = stage
         current["runtime_bias"] = runtime_bias
         store.save_learning_state(f"autogrowth::{agent_id}", current)
+        learning_journal_service.clear(agent_id)
         return current
 
 
