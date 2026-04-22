@@ -54,5 +54,14 @@ AIA는 아래 역할을 소유합니다.
 - Tests: `pytest`
 - Dependencies: `pip check`
 - Java 8 integration sample: `javac integration/java8/*.java`
+- Windows one-shot: `powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1`
+- HTTP smoke: run AIA, then `python scripts/ops_tick_smoke.py`
 
 배포 전에는 runtime issue count, fallback rate, dashboard warning을 0에 가깝게 유지해야 합니다.
+
+## Runtime Adapters
+
+- Python: `examples/python_client.py`, `scripts/ops_tick_smoke.py`
+- Java 8: `integration/java8/LocalAiaClient.java`, `integration/java8/AiaDecisionParser.java`
+- Jython 2.7: `integration/jython/aia_ops_tick_client.py`
+- Script: `scripts/run_quality_gates.ps1`

@@ -113,6 +113,7 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 게임서버는 센서 전송과 최종 실행 검증만 유지하고, AIA가 정책 판단, 네비게이션 전략, 학습/성장, 토크, 운영 체크리스트를 담당합니다.
 
 다른 서버는 우선 `POST /api/v1/robot/ops-tick` 하나만 붙여도 profile, event, observe, decide, feedback, dashboard 요약을 한 번에 연동할 수 있습니다.
+연동 샘플은 Python, Java 8, Jython 2.7, PowerShell 품질 게이트 스크립트 형태로 제공합니다.
 
 ---
 
