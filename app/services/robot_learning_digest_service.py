@@ -115,7 +115,9 @@ class RobotLearningDigestService:
                 "detail": record.detail or "",
                 "robot_uid": record.robot_uid,
                 "name": record.name,
-                "blocked": action_type in {"stall_autofix", "collision_relief"} or "nav_fail=true" in detail,
+                "blocked": action_type == "stall_autofix"
+                or (action_type == "collision_relief" and not self._is_benign_collision_relief(detail))
+                or "nav_fail=true" in detail,
                 "late_retreat": action_type in {"dead", "death_drop"} or (
                     action_type == "goto_home" and ("hp" in detail or "저하" in detail)
                 ),
@@ -133,6 +135,8 @@ class RobotLearningDigestService:
             return "DECIDE", 0.15, "partial", "aia_decision"
         if action_type in {"hunt_nav", "distributed_home", "spawn_disperse", "safe_zone_escape"}:
             return "MOVE", 0.6, "success", "navigation"
+        if action_type == "collision_relief" and self._is_benign_collision_relief(detail):
+            return "MOVE", 0.45, "success", "navigation"
         if action_type in {"stall_autofix", "collision_relief"}:
             return "MOVE", -0.6, "partial", "navigation_issue"
         if action_type in {"infinite_supply", "inventory_seed", "hp_item_use"}:
@@ -174,7 +178,9 @@ class RobotLearningDigestService:
         issues: list[dict[str, Any]] = []
         if action_type == "shop_supply":
             issues.append(self._issue(record, "item_supply_fallback", "medium", "로봇이 전용 무한 보급 대신 상점 보급 루틴을 사용했습니다."))
-        if action_type in {"stall_autofix", "collision_relief"}:
+        if action_type == "stall_autofix" or (
+            action_type == "collision_relief" and not self._is_benign_collision_relief(detail)
+        ):
             issues.append(self._issue(record, "movement_stall", "medium", "이동/충돌 자동수정이 발생했습니다. 반복 좌표와 네비게이션을 확인해야 합니다."))
         if action_type in {"runtime_exception", "weapon_equip_error"}:
             issues.append(self._issue(record, "runtime_exception", "high", "서버 런타임 예외 또는 장비 처리 예외가 발생했습니다. AIA/서버 계약과 아이템 상태를 확인해야 합니다."))
@@ -195,6 +201,20 @@ class RobotLearningDigestService:
             if not message:
                 issues.append(self._issue(record, "empty_talk", "medium", "로봇 토크 메시지가 비어 있습니다."))
         return issues
+
+    def _is_benign_collision_relief(self, detail: str) -> bool:
+        lowered = (detail or "").lower()
+        return any(
+            token in lowered
+            for token in (
+                "밀집",
+                "과밀",
+                "유저 양보",
+                "crowd",
+                "crowded",
+                "density",
+            )
+        )
 
     def _issue(self, record: RobotActionRecord, issue_type: str, severity: str, message: str) -> dict[str, Any]:
         return {
