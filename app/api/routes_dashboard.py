@@ -10,6 +10,7 @@ from app.models.dashboard_models import (
 )
 from app.services.dashboard_service import dashboard_service
 from app.services.rebalance_service import rebalance_service
+from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.shard_balancer_service import shard_balancer_service
 from app.services.world_profile_service import world_profile_service
@@ -64,3 +65,26 @@ def robot_ai_dashboard(agent_ids: list[str] = Query(default=[])) -> RobotAiOpsDa
 @router.get("/robot-ai/gui", response_class=HTMLResponse)
 def robot_ai_dashboard_gui(agent_ids: list[str] = Query(default=[])) -> HTMLResponse:
     return HTMLResponse(robot_ai_ops_service.render_dashboard_html(agent_ids))
+
+
+@router.get("/robot-autonomy-baseline")
+def robot_autonomy_baseline() -> dict:
+    return robot_autonomy_baseline_service.operator_view()
+
+
+@router.post("/robot-autonomy-baseline")
+def save_robot_autonomy_baseline(config: dict) -> dict:
+    saved = robot_autonomy_baseline_service.save_operator_config(config)
+    return {
+        "accepted": True,
+        "config_path": str(robot_autonomy_baseline_service.config_path),
+        "config": saved,
+    }
+
+
+@router.post("/robot-autonomy-baseline/reload")
+def reload_robot_autonomy_baseline() -> dict:
+    return {
+        "accepted": True,
+        "baseline": robot_autonomy_baseline_service.load(force=True),
+    }

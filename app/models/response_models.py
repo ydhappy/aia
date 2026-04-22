@@ -80,9 +80,11 @@ class RobotLearningDigestResponse(BaseModel):
     processed_records: int = 0
     processed_talk_memories: int = 0
     delete_uids: list[int] = Field(default_factory=list)
+    delete_talk_keys: list[dict[str, Any]] = Field(default_factory=list)
     issue_count: int = 0
     issues: list[dict[str, Any]] = Field(default_factory=list)
     learning_updates: int = 0
     growth_updates: int = 0
     talk_updates: int = 0
+    cleanup_policy: dict[str, Any] = Field(default_factory=dict)
     message: str = "learning digest applied"

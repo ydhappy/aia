@@ -5,6 +5,7 @@ from typing import Any
 
 from app.models.dashboard_models import RobotAiChecklistItem, RobotAiOpsDashboardResponse
 from app.models.request_models import AgentState
+from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.store_factory import store
 
 
@@ -121,12 +122,14 @@ class RobotAiOpsService:
         profile: dict[str, Any] | None = None,
         learning_state: dict[str, Any] | None = None,
         runtime_bias: dict[str, Any] | None = None,
+        agent_id: str = "",
     ) -> dict[str, Any]:
-        profile = profile or {}
         learning_state = learning_state or {}
         runtime_bias = runtime_bias or {}
+        profile = robot_autonomy_baseline_service.resolve_profile(agent_id, state, profile or {}, learning_state)
         assessment = self.assess_state(state)
         extras = state.extras or {}
+        hunt_zone = robot_autonomy_baseline_service.select_hunt_zone(state, profile, learning_state)
         actor_kind = assessment["actor_kind"]
         role = str(profile.get("role") or extras.get("role_mode") or "custom")
         group_mode = str(extras.get("hunt_group_mode") or profile.get("group_mode") or "")
@@ -182,6 +185,13 @@ class RobotAiOpsService:
             "spread_radius": self._spread_radius(assessment["robot_level"], algorithm),
             "step_budget": self._step_budget(algorithm, assessment["severity"]),
             "route_id": self._route_id(state, algorithm),
+            "hunt_zone": hunt_zone,
+            "autonomy_source": "aia_default_baseline",
+            "operator_profile": {
+                "editable_config": str(robot_autonomy_baseline_service.config_path),
+                "no_robot_book_required": True,
+                "no_talk_table_required": True,
+            },
             "server_validation": {
                 "authoritative": "server",
                 "requires_passable_tile": True,
@@ -228,6 +238,8 @@ class RobotAiOpsService:
             quality_gates=self.quality_gates(checklist, metrics, learning_summary),
             metrics=metrics,
             learning_summary=learning_summary,
+            autonomy_baseline=robot_autonomy_baseline_service.operator_view(),
+            cleanup_policy=robot_autonomy_baseline_service.cleanup_policy(),
         )
 
     def build_checklist(
@@ -246,6 +258,22 @@ class RobotAiOpsService:
             self._item("bridge", "서버-AIA 브리지", "pass", "low", "observe/decide/profile/event 계약 사용", "서버는 센서와 최종 실행만 유지"),
             self._item("dashboard", "AIA 전용 대시보드", "pass", "low", "/dashboard/robot-ai 및 /dashboard/robot-ai/gui 제공", "운영자는 AIA에서 상태 확인"),
             self._item("navigation", "네비게이션 다양성", "pass", "low", ",".join(NAVIGATION_ALGORITHMS), "상황별 알고리즘 선택"),
+            self._item(
+                "aia_default_baseline",
+                "DB 없는 기본 로봇 기준",
+                "pass",
+                "low",
+                "로봇북/토크 테이블이 비어도 AIA JSON 기준으로 사냥터와 말투 생성",
+                "운영자는 robot_autonomy_defaults.json 또는 대시보드 API로 변경",
+            ),
+            self._item(
+                "log_cleanup",
+                "학습 후 실시간 로그 정리",
+                "pass",
+                "low",
+                "digest 성공 시 action log와 학습 완료 talk memory 삭제 키 반환",
+                "issue log는 해결 확인 전까지 보존",
+            ),
             self._item(
                 "server_client_sync",
                 "서버-클라 좌표 싱크",
@@ -314,6 +342,7 @@ class RobotAiOpsService:
             "server_must_validate": ["map_match", "passable_tile", "safe_zone_rule", "target_alive", "range"],
             "client_sync_rule": "server_coordinates_are_authoritative_aia_routes_are_hints",
             "anti_clump_rule": "route_id_and_spread_radius_seed_each_robot_differently",
+            "bookless_rule": "if robot_book is empty AIA selects operator-editable hunt_zones or current-position generated zone",
         }
 
     def quality_gates(
@@ -370,6 +399,8 @@ class RobotAiOpsService:
             for item in snapshot.quality_gates
         )
         algorithms = "".join(f"<li>{escape(name)}</li>" for name in snapshot.navigation_algorithms)
+        baseline = snapshot.autonomy_baseline.get("summary", {})
+        cleanup = snapshot.cleanup_policy
         return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -407,6 +438,14 @@ class RobotAiOpsService:
   <table><thead><tr><th>키</th><th>항목</th><th>상태</th><th>위험도</th><th>상세</th><th>조치</th></tr></thead><tbody>{checklist_rows}</tbody></table>
   <h2>품질 게이트</h2>
   <table><thead><tr><th>키</th><th>상태</th><th>목표</th><th>현재</th><th>조치</th></tr></thead><tbody>{gate_rows}</tbody></table>
+  <h2>DB 없는 AIA 기준</h2>
+  <table><tbody>
+    <tr><th>운영자 설정</th><td>{escape(str(snapshot.autonomy_baseline.get('config_path', '')))}</td></tr>
+    <tr><th>사냥구역</th><td>{escape(str(baseline.get('hunt_zones', 0)))}</td></tr>
+    <tr><th>클래스 기준</th><td>{escape(str(baseline.get('class_profiles', 0)))}</td></tr>
+    <tr><th>토크 주제</th><td>{escape(str(baseline.get('talk_topics', 0)))}</td></tr>
+    <tr><th>로그정리</th><td>{escape(str(cleanup))}</td></tr>
+  </tbody></table>
   <h2>네비게이션 알고리즘</h2>
   <ul>{algorithms}</ul>
 </main>

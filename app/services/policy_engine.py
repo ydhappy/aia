@@ -53,7 +53,13 @@ class PolicyEngine:
         is_overweight = state.weight_percent is not None and state.weight_percent >= 85
         infinite_healing = state.inventory.get("infinite_healing_potion", 0)
         risk_assessment = robot_ai_ops_service.assess_state(state)
-        navigation_plan = robot_ai_ops_service.choose_navigation(state, profile, effective_learning, runtime_bias)
+        navigation_plan = robot_ai_ops_service.choose_navigation(
+            state,
+            profile,
+            effective_learning,
+            runtime_bias,
+            agent_id=str(profile.get("agent_id") or ""),
+        )
 
         if forced_action in {"MOVE", "ATTACK", "USE_SKILL", "RETREAT", "PICKUP", "IDLE"}:
             return adaptive_policy.adjust(DecideResponse(
@@ -251,6 +257,9 @@ class PolicyEngine:
                 "spread_radius",
                 "step_budget",
                 "route_id",
+                "hunt_zone",
+                "autonomy_source",
+                "operator_profile",
                 "server_validation",
                 "client_server_sync",
             ):

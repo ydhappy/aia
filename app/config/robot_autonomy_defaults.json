@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "description": "Operator editable AIA defaults used when robot book or talk DB tables are empty.",
+  "defaults": {
+    "style": "balanced",
+    "retreat_hp_threshold": 35,
+    "heal_hp_threshold": 95,
+    "move_mode": "wide_patrol",
+    "roam_radius": 22,
+    "talk_tone": "중립",
+    "talk_topic": "사냥"
+  },
+  "class_profiles": {
+    "royal": {
+      "role": "support",
+      "style": "balanced",
+      "talk_tone": "존댓말"
+    },
+    "knight": {
+      "role": "tank",
+      "style": "balanced",
+      "talk_tone": "중립"
+    },
+    "elf": {
+      "role": "scout",
+      "style": "balanced",
+      "talk_tone": "반말"
+    },
+    "wizard": {
+      "role": "healer",
+      "style": "defensive",
+      "talk_tone": "존댓말"
+    },
+    "default": {
+      "role": "dealer",
+      "style": "balanced",
+      "talk_tone": "중립"
+    }
+  },
+  "hunt_zones": [
+    {
+      "id": "talking_island_training",
+      "name": "말하는섬 초급 순찰",
+      "type": "field",
+      "map_id": 0,
+      "x": 32620,
+      "y": 32810,
+      "min_level": 1,
+      "max_level": 12,
+      "radius": 24,
+      "teleport": false,
+      "enabled": true
+    },
+    {
+      "id": "gludio_field_roam",
+      "name": "글루디오 광역 사냥",
+      "type": "field",
+      "map_id": 4,
+      "x": 32670,
+      "y": 32790,
+      "min_level": 8,
+      "max_level": 28,
+      "radius": 36,
+      "teleport": true,
+      "enabled": true
+    },
+    {
+      "id": "giran_frontier_roam",
+      "name": "기란 외곽 광역 사냥",
+      "type": "field",
+      "map_id": 4,
+      "x": 33435,
+      "y": 32805,
+      "min_level": 20,
+      "max_level": 52,
+      "radius": 42,
+      "teleport": true,
+      "enabled": true
+    },
+    {
+      "id": "heaven_realm_probe",
+      "name": "천계 탐색 사냥",
+      "type": "special",
+      "map_id": 68,
+      "x": 33400,
+      "y": 32800,
+      "min_level": 28,
+      "max_level": 70,
+      "radius": 44,
+      "teleport": false,
+      "enabled": true
+    }
+  ],
+  "talk_templates": {
+    "warning": [
+      "위험 신호가 보여서 안전 동선으로 바꿉니다.",
+      "지금은 욕심내면 손해라 한 박자 빠지겠습니다."
+    ],
+    "hunt": [
+      "시야 넓게 잡고 몬스터 흐름부터 보겠습니다.",
+      "한 좌표에 뭉치지 않게 넓게 돌겠습니다.",
+      "사냥 루트는 제가 계속 조정하면서 갑니다."
+    ],
+    "combat": [
+      "타겟 확인했습니다. 거리 맞춰서 붙겠습니다.",
+      "전투 들어갑니다. 위험하면 바로 빠집니다."
+    ],
+    "town": [
+      "마을에서는 정비하고 다시 사냥 루트를 잡겠습니다.",
+      "보급 상태 확인하고 다음 이동지를 고르겠습니다."
+    ],
+    "growth": [
+      "방금 기록은 학습에 반영했습니다. 다음 판단이 조금 더 깔끔해집니다.",
+      "같은 실수 줄이도록 경로와 말투를 같이 조정했습니다."
+    ]
+  }
+}

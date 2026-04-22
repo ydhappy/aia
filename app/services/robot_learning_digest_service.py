@@ -10,6 +10,7 @@ from app.models.request_models import (
 from app.models.response_models import RobotLearningDigestResponse
 from app.services.autonomous_growth_service import autonomous_growth_service
 from app.services.learning_service import learning_service
+from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.store_factory import store
 
 
@@ -30,6 +31,7 @@ class RobotLearningDigestService:
     def apply_digest(self, request: RobotLearningDigestRequest) -> RobotLearningDigestResponse:
         issues: list[dict[str, Any]] = []
         delete_uids: list[int] = []
+        delete_talk_keys: list[dict[str, Any]] = []
         learning_updates = 0
         growth_updates = 0
         action_counts: Counter[str] = Counter()
@@ -52,6 +54,7 @@ class RobotLearningDigestService:
         for memory in request.talk_memories:
             if self._apply_talk_memory(memory):
                 talk_updates += 1
+                delete_talk_keys.append(self._talk_delete_key(memory))
             issues.extend(self._detect_talk_memory_issues(memory))
             topic = (memory.recent_topic or "일반").strip() or "일반"
             talk_topics[topic] += 1
@@ -73,11 +76,13 @@ class RobotLearningDigestService:
             processed_records=len(request.records),
             processed_talk_memories=len(request.talk_memories),
             delete_uids=delete_uids if request.delete_after_apply else [],
+            delete_talk_keys=delete_talk_keys if request.delete_after_apply else [],
             issue_count=len(issues),
             issues=issues[:100],
             learning_updates=learning_updates,
             growth_updates=growth_updates,
             talk_updates=talk_updates,
+            cleanup_policy=robot_autonomy_baseline_service.cleanup_policy(),
         )
 
     def summary(self) -> dict[str, Any]:
@@ -209,6 +214,8 @@ class RobotLearningDigestService:
         }
 
     def _apply_talk_memory(self, memory: RobotTalkMemoryRecord) -> bool:
+        if not (memory.last_message or "").strip():
+            return False
         state = store.get_learning_state(memory.agent_id) or {}
         talk_stats = state.get("talk_stats", {})
         topic = (memory.recent_topic or "일반").strip() or "일반"
@@ -225,6 +232,13 @@ class RobotLearningDigestService:
         state["preferred_talk_topic"] = max(talk_stats.items(), key=lambda item: item[1].get("count", 0))[0]
         store.save_learning_state(memory.agent_id, state)
         return True
+
+    def _talk_delete_key(self, memory: RobotTalkMemoryRecord) -> dict[str, Any]:
+        return {
+            "robot_uid": memory.robot_uid,
+            "target_name": memory.target_name or "",
+            "target_kind": memory.target_kind or "pc",
+        }
 
     def _detect_talk_memory_issues(self, memory: RobotTalkMemoryRecord) -> list[dict[str, Any]]:
         message = (memory.last_message or "").strip()
@@ -283,7 +297,11 @@ class RobotLearningDigestService:
         return dict(sorted(merged.items(), key=lambda item: item[1], reverse=True)[:40])
 
     def _estimate_learning_agents(self) -> int:
-        # In-memory and Redis stores intentionally do not expose all keys; summary keeps this conservative.
+        if hasattr(store, "list_learning_ids"):
+            try:
+                return len([agent_id for agent_id in store.list_learning_ids() if not str(agent_id).startswith(("growth::", "autogrowth::", "automation::", "group::"))])
+            except Exception:
+                return 0
         return 0
 
 

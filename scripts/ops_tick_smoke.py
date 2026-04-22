@@ -54,10 +54,18 @@ def main() -> None:
         data = json.loads(response.read().decode("utf-8"))
     decision = data.get("decide_result") or {}
     args = decision.get("action_args") or {}
+    profile = data.get("autonomy_profile") or {}
+    metadata = profile.get("metadata") or {}
+    talk = data.get("talk_suggestion") or {}
+    cleanup = data.get("cleanup_policy") or {}
     print("OPS_TICK_OK=1")
     print("ACTION=%s" % decision.get("action"))
     print("ROUTE_ID=%s" % args.get("route_id"))
     print("CHECKLIST=%s" % data.get("checklist_status"))
+    print("NO_DB_BASELINE=%s" % metadata.get("no_robot_book_required"))
+    print("HUNT_ZONE=%s" % metadata.get("hunt_zone_id"))
+    print("TALK=%s" % talk.get("message"))
+    print("TALK_CLEANUP=%s" % cleanup.get("talk_memories"))
 
 
 if __name__ == "__main__":

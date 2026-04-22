@@ -46,3 +46,5 @@ class RobotAiOpsDashboardResponse(BaseModel):
     quality_gates: list[dict[str, Any]] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)
     learning_summary: dict[str, Any] = Field(default_factory=dict)
+    autonomy_baseline: dict[str, Any] = Field(default_factory=dict)
+    cleanup_policy: dict[str, Any] = Field(default_factory=dict)

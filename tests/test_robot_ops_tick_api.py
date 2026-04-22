@@ -54,6 +54,9 @@ def test_robot_ops_tick_combines_observe_decide_dashboard() -> None:
     assert body["observe_result"]["accepted"] is True
     assert body["decide_result"]["action"] in {"MOVE", "IDLE"}
     assert body["dashboard"]["mode"] == "aia_first_server_minimal"
+    assert body["autonomy_profile"]["metadata"]["no_robot_book_required"] is True
+    assert body["talk_suggestion"]["message"]
+    assert body["cleanup_policy"]["action_logs"] == "delete_after_digest_apply"
     assert body["server_minimal_contract"]["portable"] is True
     if body["decide_result"]["action"] == "MOVE":
         assert body["decide_result"]["action_args"]["points"]

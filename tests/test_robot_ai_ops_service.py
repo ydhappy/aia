@@ -130,6 +130,9 @@ def test_dashboard_snapshot_contains_checklist() -> None:
     assert snapshot.total_agents == 1
     assert snapshot.active_agents == 1
     assert snapshot.dependency_score > 0
-    assert {item.key for item in snapshot.checklist} >= {"bridge", "dashboard", "navigation", "issues"}
+    assert {item.key for item in snapshot.checklist} >= {"bridge", "dashboard", "navigation", "issues", "aia_default_baseline", "log_cleanup"}
     assert snapshot.navigation_contract["anti_clump_rule"]
+    assert snapshot.navigation_contract["bookless_rule"]
+    assert snapshot.autonomy_baseline["no_db_required"] is True
+    assert snapshot.cleanup_policy["talk_memories"] == "delete_after_digest_apply_when_last_message_was_learned"
     assert {gate["key"] for gate in snapshot.quality_gates} >= {"compile", "runtime", "fallback", "dashboard"}

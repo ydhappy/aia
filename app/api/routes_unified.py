@@ -10,6 +10,7 @@ from app.models.unified_api_models import (
 )
 from app.services.agent_service import agent_service
 from app.services.automation_service import automation_service
+from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.learning_service import learning_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.store_factory import store
@@ -90,7 +91,21 @@ def robot_ops_tick(request: AiaRobotOpsTickRequest) -> AiaRobotOpsTickResponse:
 
     agent_id = _resolve_agent_id(request)
     state = _resolve_state_payload(request)
+    agent_state = _resolve_agent_state(request)
     automation_next_step = automation_service.decide_next_step(agent_id, state).next_step if agent_id else {}
+    learning_state = store.get_learning_state(agent_id) if agent_id else {}
+    base_profile = store.get_profile(agent_id) if agent_id else {}
+    autonomy_profile = (
+        robot_autonomy_baseline_service.resolve_profile(agent_id, agent_state, base_profile, learning_state)
+        if agent_id and agent_state is not None
+        else base_profile
+    )
+    assessment = robot_ai_ops_service.assess_state(agent_state) if agent_state is not None else {}
+    talk_suggestion = (
+        robot_autonomy_baseline_service.build_talk_suggestion(agent_id, agent_state, autonomy_profile, learning_state, assessment)
+        if agent_id and agent_state is not None
+        else {}
+    )
     agent_ids = [agent_id] if agent_id else []
     dashboard = robot_ai_ops_service.dashboard_snapshot(agent_ids) if request.include_dashboard else None
     checklist_status = _checklist_status(dashboard)
@@ -112,6 +127,9 @@ def robot_ops_tick(request: AiaRobotOpsTickRequest) -> AiaRobotOpsTickResponse:
         dashboard=dashboard,
         checklist_status=checklist_status,
         server_minimal_contract=server_contract,
+        autonomy_profile=autonomy_profile,
+        talk_suggestion=talk_suggestion,
+        cleanup_policy=robot_autonomy_baseline_service.cleanup_policy(),
     )
 
 
@@ -137,6 +155,14 @@ def _resolve_state_payload(request: AiaRobotOpsTickRequest) -> dict:
     if request.observe is not None:
         return request.observe.state.model_dump()
     return {}
+
+
+def _resolve_agent_state(request: AiaRobotOpsTickRequest):
+    if request.decide is not None:
+        return request.decide.state
+    if request.observe is not None:
+        return request.observe.state
+    return None
 
 
 def _checklist_status(dashboard) -> str:

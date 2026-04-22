@@ -59,3 +59,6 @@ class AiaRobotOpsTickResponse(BaseModel):
     dashboard: RobotAiOpsDashboardResponse | None = None
     checklist_status: str = "unknown"
     server_minimal_contract: dict = Field(default_factory=dict)
+    autonomy_profile: dict = Field(default_factory=dict)
+    talk_suggestion: dict = Field(default_factory=dict)
+    cleanup_policy: dict = Field(default_factory=dict)

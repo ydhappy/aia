@@ -15,6 +15,7 @@ AIA는 아래 역할을 소유합니다.
 - 정책 판단, 위험도 판정, 네비게이션 전략, 분산 사냥, 텔포사냥 힌트.
 - 토크, 학습, 성장, 이슈 체크리스트, 운영 대시보드.
 - 다른 서버에서도 사용할 수 있는 `/api/v1/robot/ops-tick` 단일 운영 API.
+- `_robot_book`, `_robot_talk` 같은 DB 기준이 비어 있어도 AIA 기본 기준으로 사냥터/토크를 생성.
 
 ## Ops Tick API
 
@@ -40,6 +41,20 @@ AIA는 아래 역할을 소유합니다.
 - `step_budget`: 이번 tick에서 허용할 이동/탐색 강도.
 - `server_validation`: 서버가 반드시 검증해야 할 조건.
 - `client_server_sync`: 클라-서버 좌표 싱크 원칙.
+- `hunt_zone`: DB 로봇북이 없을 때 AIA가 선택한 운영자 편집 가능 사냥 기준.
+- `talk_suggestion`: DB 토크 테이블이 없어도 AIA가 만든 현재 상황 대화 힌트.
+
+## DB-Less Autonomy Baseline
+
+운영자 편집 파일: `app/config/robot_autonomy_defaults.json`
+
+이 파일에서 기본 사냥터, 클래스별 역할/성향, 토크 문구를 수정할 수 있습니다. 서버 DB의 로봇북이나 토크 테이블이 비어 있어도 AIA는 이 파일을 기준으로 임시 프로필, 순찰 좌표, 말투를 생성합니다.
+
+- 조회: `GET /dashboard/robot-autonomy-baseline`
+- 저장: `POST /dashboard/robot-autonomy-baseline`
+- 리로드: `POST /dashboard/robot-autonomy-baseline/reload`
+
+학습 digest가 성공하면 응답은 `delete_uids`와 `delete_talk_keys`를 내려줍니다. 서버는 학습 반영이 끝난 `_robot_action_log`와 `_robot_talk_memory` 실시간 기록을 삭제하고, `_robot_aia_issue_log`는 해결 확인 전까지 보존합니다.
 
 ## Dashboard
 

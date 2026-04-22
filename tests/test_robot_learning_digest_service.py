@@ -30,6 +30,7 @@ def test_learning_digest_applies_feedback_and_returns_delete_uids() -> None:
     growth = store.get_learning_state("growth::robot_1")
     assert response.processed_records == 1
     assert response.delete_uids == [101]
+    assert response.cleanup_policy["action_logs"] == "delete_after_digest_apply"
     assert learning["preferred_action"] == "MOVE"
     assert growth["stage"] in {"novice", "stable", "optimized", "expert"}
 
@@ -72,6 +73,7 @@ def test_learning_digest_detects_supply_and_talk_issues() -> None:
     learning = store.get_learning_state("robot_2")
     issue_types = {issue["issue_type"] for issue in response.issues}
     assert response.issue_count == 2
+    assert response.delete_talk_keys == [{"robot_uid": 2, "target_name": "유저", "target_kind": "pc"}]
     assert "item_supply_fallback" in issue_types
     assert "empty_talk" in issue_types
     assert learning["preferred_talk_topic"] == "사냥"
@@ -150,3 +152,4 @@ def test_learning_digest_detects_runtime_and_talk_memory_issues() -> None:
     assert "runtime_exception" in issue_types
     assert "low_confidence_decision" in issue_types
     assert "empty_talk_memory" in issue_types
+    assert response.delete_talk_keys == []

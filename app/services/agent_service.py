@@ -10,6 +10,8 @@ from app.services.llm_client import llm_client
 from app.services.llm_parser import llm_parser
 from app.services.meta_policy_service import meta_policy_service
 from app.services.policy_engine import policy_engine
+from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
+from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.runtime_overrides import runtime_overrides
 from app.services.store_factory import store
 from app.utils.validators import action_validator
@@ -53,9 +55,17 @@ class AgentService:
 
     def decide(self, request: DecideRequest) -> DecideResponse:
         store.increment_decide()
-        profile = store.get_profile(request.agent_id)
+        raw_profile = store.get_profile(request.agent_id)
         recent_events = store.get_recent_events(request.agent_id)
         learning_state = store.get_learning_state(request.agent_id)
+        profile = robot_autonomy_baseline_service.resolve_profile(
+            request.agent_id,
+            request.state,
+            raw_profile,
+            learning_state,
+        )
+        if not raw_profile:
+            store.save_profile(request.agent_id, profile)
         growth_state = growth_service.get_growth_state(request.agent_id).model_dump()
         autogrowth_state = store.get_learning_state(f"autogrowth::{request.agent_id}") or {}
         runtime_bias = autogrowth_state.get("runtime_bias", {}) if isinstance(autogrowth_state, dict) else {}
@@ -78,11 +88,21 @@ class AgentService:
         )
         anomalies = anomaly_detection_service.detect(trace, growth_state)
         meta_policy = meta_policy_service.select_strategy(profile, growth_state, anomalies)
+        assessment = robot_ai_ops_service.assess_state(request.state)
+        talk_suggestion = robot_autonomy_baseline_service.build_talk_suggestion(
+            request.agent_id,
+            request.state,
+            profile,
+            learning_state,
+            assessment,
+        )
         trace["runtime_override"] = override_info
         trace["runtime_bias"] = runtime_bias
         trace["growth_state"] = growth_state
         trace["anomalies"] = anomalies
         trace["meta_policy"] = meta_policy
+        trace["autonomy_profile"] = profile
+        trace["talk_suggestion"] = talk_suggestion
         store.save_trace(request.agent_id, self._compact_trace(trace))
 
         if trace.get("llm_hint"):
@@ -111,6 +131,7 @@ class AgentService:
             )
             valid, reason = action_validator.validate(decision, request.state)
             if valid:
+                decision.action_args.setdefault("talk_suggestion", talk_suggestion)
                 trace["final_source"] = decision.source
                 trace["final_reason"] = decision.reason
                 trace["learning_preferred_action"] = learning_state.get("preferred_action")
