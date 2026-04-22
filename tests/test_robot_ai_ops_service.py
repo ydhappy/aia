@@ -143,6 +143,50 @@ def test_ops_navigation_points_are_deterministic_and_anti_clump_ready() -> None:
     assert first["client_server_sync"]["aia_is_strategy_owner"] is True
 
 
+def test_ops_uses_siege_attack_when_giran_war_is_active() -> None:
+    state = AgentState(
+        hp=91,
+        mp=30,
+        x=33620,
+        y=32700,
+        map_id=4,
+        can_teleport=True,
+        extras={
+            "level": 52,
+            "siege_active": True,
+            "siege_offense": True,
+            "siege_throne_x": 33631,
+            "siege_throne_y": 32678,
+            "siege_throne_map": 4,
+        },
+    )
+
+    decision = policy_engine.decide(state, profile={"role": "siege_offense"})
+
+    assert decision.action == "MOVE"
+    assert decision.action_args["nav_algorithm"] == "siege_attack"
+    assert decision.action_args["target_map_id"] == 4
+    assert decision.action_args["points"][0]["map_id"] == 4
+
+
+def test_ops_uses_dungeon_sweep_without_robot_book() -> None:
+    state = AgentState(
+        hp=92,
+        mp=30,
+        x=32750,
+        y=32750,
+        map_id=70,
+        can_teleport=False,
+        extras={"level": 38, "dungeon_map": True, "local_area_level": 34},
+    )
+
+    decision = policy_engine.decide(state)
+
+    assert decision.action == "MOVE"
+    assert decision.action_args["nav_algorithm"] == "dungeon_sweep"
+    assert decision.action_args["mode"] == "corridor_sweep"
+
+
 def test_dashboard_snapshot_contains_checklist() -> None:
     store.save_state("robot_dash", 1, {"hp": 90})
     snapshot = robot_ai_ops_service.dashboard_snapshot(["robot_dash"])

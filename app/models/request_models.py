@@ -40,7 +40,17 @@ class DecideRequest(BaseModel):
     state: AgentState
 
 
-RobotRole = Literal["tank", "healer", "dealer", "collector", "support", "scout", "custom"]
+RobotRole = Literal[
+    "tank",
+    "healer",
+    "dealer",
+    "collector",
+    "support",
+    "scout",
+    "siege_offense",
+    "siege_defense",
+    "custom",
+]
 RobotStyle = Literal["aggressive", "defensive", "balanced", "support", "custom"]
 
 

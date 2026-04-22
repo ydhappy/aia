@@ -13,7 +13,10 @@ NAVIGATION_ALGORITHMS = [
     "monster_track",
     "spawn_anchor",
     "frontier_roam",
+    "dungeon_sweep",
     "party_rally",
+    "siege_attack",
+    "siege_defense",
     "teleport_hunt",
     "safe_zone_exit",
     "danger_retreat",
@@ -140,6 +143,10 @@ class RobotAiOpsService:
         role = str(profile.get("role") or extras.get("role_mode") or "custom")
         group_mode = str(extras.get("hunt_group_mode") or profile.get("group_mode") or "")
         preferred_algorithm = str(runtime_bias.get("nav_algorithm") or learning_state.get("preferred_nav_algorithm") or "")
+        siege_active = self._to_bool(extras.get("siege_active"))
+        siege_offense = self._to_bool(extras.get("siege_offense")) or role == "siege_offense"
+        siege_defense = self._to_bool(extras.get("siege_defense")) or role == "siege_defense"
+        dungeon_context = self._to_bool(extras.get("dungeon_map")) or self._to_bool(extras.get("dungeon_role"))
 
         if assessment["should_retreat"]:
             algorithm = "danger_retreat"
@@ -149,6 +156,14 @@ class RobotAiOpsService:
             algorithm = "safe_zone_exit"
             mode = "patrol"
             reason = "safe_zone_reposition"
+        elif siege_active and siege_defense:
+            algorithm = "siege_defense"
+            mode = "guard_throne"
+            reason = "active_siege_defense"
+        elif siege_active and siege_offense:
+            algorithm = "siege_attack"
+            mode = "breach_gate"
+            reason = "active_siege_offense"
         elif actor_kind == "pc_auto_hunt":
             algorithm = "pc_auto_hunt_sync"
             mode = "target_priority"
@@ -157,6 +172,10 @@ class RobotAiOpsService:
             algorithm = "monster_track" if state.target_distance <= 8 else "spawn_anchor"
             mode = "approach" if state.target_distance > 1 else "engage"
             reason = "target_visible"
+        elif dungeon_context and not assessment["danger_hotspot"]:
+            algorithm = "dungeon_sweep"
+            mode = "corridor_sweep"
+            reason = "dungeon_context"
         elif state.can_teleport and self._to_bool(extras.get("teleport_hunt_enabled")):
             algorithm = "teleport_hunt"
             mode = "teleport_probe"
@@ -520,7 +539,12 @@ class RobotAiOpsService:
         radius = self._spread_radius(level, algorithm)
         base_x = self._to_int(profile.get("home_x", extras.get("home_x")), state.x)
         base_y = self._to_int(profile.get("home_y", extras.get("home_y")), state.y)
-        if algorithm in {"frontier_roam", "monster_track", "teleport_hunt", "pc_auto_hunt_sync"}:
+        map_id = int(state.map_id)
+        if algorithm in {"siege_attack", "siege_defense"}:
+            base_x = self._to_int(extras.get("siege_throne_x") or extras.get("siege_x"), state.x)
+            base_y = self._to_int(extras.get("siege_throne_y") or extras.get("siege_y"), state.y)
+            map_id = self._to_int(extras.get("siege_throne_map") or extras.get("siege_map"), map_id)
+        elif algorithm in {"frontier_roam", "monster_track", "teleport_hunt", "pc_auto_hunt_sync", "dungeon_sweep"}:
             base_x = state.x
             base_y = state.y
         seed = self._seed(state, algorithm)
@@ -541,7 +565,7 @@ class RobotAiOpsService:
             points.append({
                 "x": base_x + dx * spread,
                 "y": base_y + dy * spread,
-                "map_id": int(state.map_id),
+                "map_id": map_id,
                 "weight": 100 - index * 15,
             })
         return points
@@ -562,6 +586,12 @@ class RobotAiOpsService:
             return base + 6
         if algorithm == "party_rally":
             return max(6, base - 4)
+        if algorithm == "dungeon_sweep":
+            return base + 8
+        if algorithm == "siege_attack":
+            return max(10, base)
+        if algorithm == "siege_defense":
+            return max(6, base - 6)
         if algorithm == "teleport_hunt":
             return base + 14
         return base
@@ -569,9 +599,9 @@ class RobotAiOpsService:
     def _step_budget(self, algorithm: str, severity: str) -> int:
         if severity == "high":
             return 1
-        if algorithm in {"teleport_hunt", "frontier_roam"}:
+        if algorithm in {"teleport_hunt", "frontier_roam", "dungeon_sweep", "siege_attack"}:
             return 5
-        if algorithm in {"spawn_anchor", "party_rally"}:
+        if algorithm in {"spawn_anchor", "party_rally", "siege_defense"}:
             return 4
         return 3
 

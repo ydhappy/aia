@@ -218,7 +218,16 @@ class PolicyEngine:
                 source="rule_engine",
             ), effective_learning)
 
-        if navigation_plan.get("algorithm") in {"frontier_roam", "spawn_anchor", "party_rally", "teleport_hunt", "pc_auto_hunt_sync"} and not state.safe_zone:
+        if navigation_plan.get("algorithm") in {
+            "frontier_roam",
+            "spawn_anchor",
+            "dungeon_sweep",
+            "party_rally",
+            "siege_attack",
+            "siege_defense",
+            "teleport_hunt",
+            "pc_auto_hunt_sync",
+        } and not state.safe_zone:
             return adaptive_policy.adjust(DecideResponse(
                 action="MOVE",
                 action_args=self._with_navigation({
