@@ -88,6 +88,25 @@ def test_policy_uses_available_potion_when_hp_below_95() -> None:
     assert decision.reason == "hp_below_95_use_available_potion"
 
 
+def test_policy_retreats_before_heal_on_critical_hp_risk() -> None:
+    state = AgentState(
+        hp=22,
+        mp=20,
+        x=33115,
+        y=32296,
+        map_id=4,
+        can_teleport=True,
+        must_use_hp_item=True,
+        inventory={"potion": 10},
+        extras={"level": 11, "learning_death_count": 1, "learning_caution": 5},
+    )
+    decision = policy_engine.decide(state)
+    assert decision.action == "RETREAT"
+    assert decision.action_args["use_hp_item_first"] is True
+    assert decision.action_args["item"] == "potion"
+    assert decision.reason.startswith("critical_hp_retreat_before_heal")
+
+
 def test_policy_returns_diverse_navigation_when_no_target() -> None:
     state = AgentState(
         hp=90,

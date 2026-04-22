@@ -70,6 +70,23 @@ class PolicyEngine:
                 source="rule_engine",
             ), effective_learning)
 
+        if risk_assessment.get("should_retreat") and state.hp <= 35 and not state.safe_zone:
+            item_hint = "infinite_healing_potion" if infinite_healing > 0 else "potion" if potion_count > 0 else ""
+            return adaptive_policy.adjust(DecideResponse(
+                action="RETREAT",
+                action_args=self._with_navigation({
+                    "mode": navigation_plan.get("mode") or ("teleport" if state.can_teleport else "safe_zone"),
+                    "role": role,
+                    "growth_stage": growth_stage,
+                    "risk_score": risk_assessment.get("risk_score", 0),
+                    "use_hp_item_first": bool(item_hint),
+                    "item": item_hint,
+                }, navigation_plan),
+                confidence=0.99,
+                reason="critical_hp_retreat_before_heal:" + ",".join(risk_assessment.get("reasons", [])[:3]),
+                source="rule_engine",
+            ), effective_learning)
+
         if state.must_use_hp_item and infinite_healing > 0:
             return adaptive_policy.adjust(DecideResponse(
                 action="USE_SKILL",

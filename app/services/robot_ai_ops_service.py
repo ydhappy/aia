@@ -84,6 +84,12 @@ class RobotAiOpsService:
         if learning_deaths >= 3 and learning_caution >= 5:
             risk_score += 56
             reasons.append(f"repeat_death_profile:{learning_deaths}/{learning_caution}")
+        elif learning_deaths >= 2 and learning_caution >= 4:
+            risk_score += 38
+            reasons.append(f"early_repeat_death_profile:{learning_deaths}/{learning_caution}")
+        elif learning_deaths >= 1 and learning_caution >= 5 and state.hp <= 70:
+            risk_score += 24
+            reasons.append(f"death_caution_hp_pressure:{learning_deaths}/{learning_caution}")
         elif learning_deaths >= 3:
             risk_score += 16
             reasons.append(f"death_history:{learning_deaths}")
