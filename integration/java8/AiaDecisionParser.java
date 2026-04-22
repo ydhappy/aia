@@ -25,6 +25,14 @@ public class AiaDecisionParser {
         return new AiaDecision(action, actionArgsJson, confidence, reason, source);
     }
 
+    public AiaDecision parseOpsTick(String json) {
+        String decideResultJson = readObject(json, "decide_result", "");
+        if (decideResultJson.length() > 0 && !"null".equals(decideResultJson)) {
+            return parse(decideResultJson);
+        }
+        return parse(json);
+    }
+
     public AiaDecision fallback(String reason) {
         return new AiaDecision("IDLE", EMPTY_JSON_OBJECT, 0.0d, reason, "java_fallback");
     }
@@ -85,8 +93,11 @@ public class AiaDecisionParser {
         if (colon < 0) {
             return defaultValue;
         }
-        int braceStart = json.indexOf('{', colon + 1);
-        if (braceStart < 0) {
+        int braceStart = colon + 1;
+        while (braceStart < json.length() && " \t\r\n".indexOf(json.charAt(braceStart)) >= 0) {
+            braceStart++;
+        }
+        if (braceStart >= json.length() || json.charAt(braceStart) != '{') {
             return defaultValue;
         }
         int depth = 0;

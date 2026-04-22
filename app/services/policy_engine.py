@@ -234,6 +234,20 @@ class PolicyEngine:
             merged.setdefault("nav_reason", navigation_plan.get("reason"))
             merged.setdefault("risk_score", navigation_plan.get("risk_score"))
             merged.setdefault("risk_severity", navigation_plan.get("severity"))
+            for key in (
+                "points",
+                "target_x",
+                "target_y",
+                "target_map_id",
+                "spread_radius",
+                "step_budget",
+                "route_id",
+                "server_validation",
+                "client_server_sync",
+            ):
+                value = navigation_plan.get(key)
+                if value is not None:
+                    merged.setdefault(key, value)
         return merged
 
 

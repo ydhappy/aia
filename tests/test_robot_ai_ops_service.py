@@ -61,6 +61,27 @@ def test_policy_returns_diverse_navigation_when_no_target() -> None:
     decision = policy_engine.decide(state)
     assert decision.action == "MOVE"
     assert decision.action_args["nav_algorithm"] in {"teleport_hunt", "spawn_anchor", "frontier_roam"}
+    assert decision.action_args["points"]
+    assert decision.action_args["target_map_id"] == 4
+    assert decision.action_args["server_validation"]["authoritative"] == "server"
+
+
+def test_ops_navigation_points_are_deterministic_and_anti_clump_ready() -> None:
+    state = AgentState(
+        hp=90,
+        mp=20,
+        x=33400,
+        y=32800,
+        map_id=68,
+        can_teleport=False,
+        extras={"level": 28, "robot_uid": 1001},
+    )
+    first = robot_ai_ops_service.choose_navigation(state)
+    second = robot_ai_ops_service.choose_navigation(state)
+    assert first["points"] == second["points"]
+    assert first["route_id"] == second["route_id"]
+    assert first["spread_radius"] >= 10
+    assert first["client_server_sync"]["aia_is_strategy_owner"] is True
 
 
 def test_dashboard_snapshot_contains_checklist() -> None:
@@ -70,3 +91,5 @@ def test_dashboard_snapshot_contains_checklist() -> None:
     assert snapshot.active_agents == 1
     assert snapshot.dependency_score > 0
     assert {item.key for item in snapshot.checklist} >= {"bridge", "dashboard", "navigation", "issues"}
+    assert snapshot.navigation_contract["anti_clump_rule"]
+    assert {gate["key"] for gate in snapshot.quality_gates} >= {"compile", "runtime", "fallback", "dashboard"}

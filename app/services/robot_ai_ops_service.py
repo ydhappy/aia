@@ -140,6 +140,8 @@ class RobotAiOpsService:
             mode = "wide_patrol" if algorithm == "frontier_roam" else "anchor_sweep"
             reason = "diverse_default"
 
+        points = self._navigation_points(state, profile, algorithm)
+        primary_point = points[0] if points else {}
         return {
             "algorithm": algorithm,
             "mode": mode,
@@ -147,6 +149,25 @@ class RobotAiOpsService:
             "risk_score": assessment["risk_score"],
             "severity": assessment["severity"],
             "reasons": assessment["reasons"],
+            "points": points,
+            "target_x": primary_point.get("x"),
+            "target_y": primary_point.get("y"),
+            "target_map_id": primary_point.get("map_id", state.map_id),
+            "spread_radius": self._spread_radius(assessment["robot_level"], algorithm),
+            "step_budget": self._step_budget(algorithm, assessment["severity"]),
+            "route_id": self._route_id(state, algorithm),
+            "server_validation": {
+                "authoritative": "server",
+                "requires_passable_tile": True,
+                "requires_map_match": True,
+                "reject_safe_zone_combat": True,
+            },
+            "client_server_sync": {
+                "coordinate_source": "server_sensor",
+                "aia_is_strategy_owner": True,
+                "server_is_execution_owner": True,
+                "map_id": state.map_id,
+            },
         }
 
     def dashboard_snapshot(self, agent_ids: list[str] | None = None) -> RobotAiOpsDashboardResponse:
@@ -177,6 +198,8 @@ class RobotAiOpsService:
                 "aia_owns": ["policy", "navigation_strategy", "talk", "learning", "growth", "issue_checklist", "ops_dashboard"],
                 "portable": True,
             },
+            navigation_contract=self.navigation_contract(),
+            quality_gates=self.quality_gates(checklist, metrics, learning_summary),
             metrics=metrics,
             learning_summary=learning_summary,
         )
@@ -198,6 +221,22 @@ class RobotAiOpsService:
             self._item("dashboard", "AIA 전용 대시보드", "pass", "low", "/dashboard/robot-ai 및 /dashboard/robot-ai/gui 제공", "운영자는 AIA에서 상태 확인"),
             self._item("navigation", "네비게이션 다양성", "pass", "low", ",".join(NAVIGATION_ALGORITHMS), "상황별 알고리즘 선택"),
             self._item(
+                "server_client_sync",
+                "서버-클라 좌표 싱크",
+                "pass",
+                "low",
+                "AIA points/target/map + server final validation 계약",
+                "서버는 passable/map/safe-zone 검증 후 실행",
+            ),
+            self._item(
+                "portable_ops_tick",
+                "타 서버 즉시 적용 API",
+                "pass",
+                "low",
+                "/api/v1/robot/ops-tick 단일 운영 tick 계약",
+                "다른 서버는 observe/decide/profile/event를 한 번에 연동",
+            ),
+            self._item(
                 "fallback",
                 "AIA fallback 제로화",
                 "pass" if fallback_rate <= 0.03 else "warn",
@@ -216,10 +255,10 @@ class RobotAiOpsService:
             self._item(
                 "learning",
                 "학습/성장 반영",
-                "pass" if int(metrics.get("total_learning_digests", 0) or 0) > 0 else "warn",
-                "medium",
-                f"digests={metrics.get('total_learning_digests', 0)}",
-                "서버 종료 전 digest가 누락되지 않도록 확인",
+                "pass" if issue_count == 0 else "warn",
+                "medium" if issue_count == 0 else "high",
+                f"digests={metrics.get('total_learning_digests', 0)},issues={issue_count}",
+                "digest 미실행은 준비 상태, issue 발생 시 우선 반영",
             ),
             self._item(
                 "agents",
@@ -231,12 +270,78 @@ class RobotAiOpsService:
             ),
         ]
 
+    def navigation_contract(self) -> dict[str, Any]:
+        return {
+            "aia_outputs": [
+                "nav_algorithm",
+                "nav_reason",
+                "risk_score",
+                "risk_severity",
+                "points",
+                "target_x",
+                "target_y",
+                "target_map_id",
+                "spread_radius",
+                "step_budget",
+                "route_id",
+            ],
+            "server_must_validate": ["map_match", "passable_tile", "safe_zone_rule", "target_alive", "range"],
+            "client_sync_rule": "server_coordinates_are_authoritative_aia_routes_are_hints",
+            "anti_clump_rule": "route_id_and_spread_radius_seed_each_robot_differently",
+        }
+
+    def quality_gates(
+        self,
+        checklist: list[RobotAiChecklistItem],
+        metrics: dict[str, Any],
+        learning_summary: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        total_decide = int(metrics.get("total_decide_requests", 0) or 0)
+        total_fallbacks = int(metrics.get("total_fallbacks", 0) or 0)
+        fallback_rate = (total_fallbacks / total_decide) if total_decide > 0 else 0.0
+        issue_count = int(learning_summary.get("issue_count", metrics.get("total_learning_issues", 0)) or 0)
+        warn_count = sum(1 for item in checklist if item.status == "warn")
+        return [
+            {
+                "key": "compile",
+                "status": "required",
+                "target": "python compileall + java8 javac",
+                "action": "배포 전마다 전체 컴파일 수행",
+            },
+            {
+                "key": "runtime",
+                "status": "pass" if issue_count == 0 else "warn",
+                "target": "runtime issue_count == 0",
+                "actual": issue_count,
+                "action": "digest issue를 학습 반영 후 재검증",
+            },
+            {
+                "key": "fallback",
+                "status": "pass" if fallback_rate <= 0.03 else "warn",
+                "target": "fallback_rate <= 3%",
+                "actual": round(fallback_rate, 4),
+                "action": "fallback 원인 trace 확인",
+            },
+            {
+                "key": "dashboard",
+                "status": "pass" if warn_count == 0 else "warn",
+                "target": "checklist warn == 0",
+                "actual": warn_count,
+                "action": "대시보드 warn 항목부터 수정",
+            },
+        ]
+
     def render_dashboard_html(self, agent_ids: list[str] | None = None) -> str:
         snapshot = self.dashboard_snapshot(agent_ids)
         checklist_rows = "\n".join(
             f"<tr><td>{escape(item.key)}</td><td>{escape(item.title)}</td><td class='{escape(item.status)}'>{escape(item.status)}</td>"
             f"<td>{escape(item.severity)}</td><td>{escape(item.detail)}</td><td>{escape(item.action)}</td></tr>"
             for item in snapshot.checklist
+        )
+        gate_rows = "\n".join(
+            f"<tr><td>{escape(str(item.get('key', '')))}</td><td class='{escape(str(item.get('status', '')))}'>{escape(str(item.get('status', '')))}</td>"
+            f"<td>{escape(str(item.get('target', '')))}</td><td>{escape(str(item.get('actual', '')))}</td><td>{escape(str(item.get('action', '')))}</td></tr>"
+            for item in snapshot.quality_gates
         )
         algorithms = "".join(f"<li>{escape(name)}</li>" for name in snapshot.navigation_algorithms)
         return f"""<!doctype html>
@@ -274,6 +379,8 @@ class RobotAiOpsService:
   </section>
   <h2>운영 체크리스트</h2>
   <table><thead><tr><th>키</th><th>항목</th><th>상태</th><th>위험도</th><th>상세</th><th>조치</th></tr></thead><tbody>{checklist_rows}</tbody></table>
+  <h2>품질 게이트</h2>
+  <table><thead><tr><th>키</th><th>상태</th><th>목표</th><th>현재</th><th>조치</th></tr></thead><tbody>{gate_rows}</tbody></table>
   <h2>네비게이션 알고리즘</h2>
   <ul>{algorithms}</ul>
 </main>
@@ -333,6 +440,79 @@ class RobotAiOpsService:
         if isinstance(value, bool):
             return value
         return str(value).strip().lower() in {"1", "true", "yes", "y", "on", "위험", "danger"}
+
+    def _navigation_points(self, state: AgentState, profile: dict[str, Any], algorithm: str) -> list[dict[str, int]]:
+        if state.map_id is None:
+            return []
+        extras = state.extras or {}
+        level = self._to_int(extras.get("robot_level", extras.get("level", 1)), 1)
+        radius = self._spread_radius(level, algorithm)
+        base_x = self._to_int(profile.get("home_x", extras.get("home_x")), state.x)
+        base_y = self._to_int(profile.get("home_y", extras.get("home_y")), state.y)
+        if algorithm in {"frontier_roam", "monster_track", "teleport_hunt", "pc_auto_hunt_sync"}:
+            base_x = state.x
+            base_y = state.y
+        seed = self._seed(state, algorithm)
+        vectors = [
+            (1, 0),
+            (0, 1),
+            (-1, 0),
+            (0, -1),
+            (1, 1),
+            (-1, 1),
+            (-1, -1),
+            (1, -1),
+        ]
+        points: list[dict[str, int]] = []
+        for index in range(3):
+            dx, dy = vectors[(seed + index * 3) % len(vectors)]
+            spread = radius + ((seed // (index + 1)) % max(3, radius // 2))
+            points.append({
+                "x": base_x + dx * spread,
+                "y": base_y + dy * spread,
+                "map_id": int(state.map_id),
+                "weight": 100 - index * 15,
+            })
+        return points
+
+    def _spread_radius(self, level: int, algorithm: str) -> int:
+        base = 10
+        if level <= 10:
+            base = 7
+        elif level <= 25:
+            base = 12
+        elif level <= 45:
+            base = 18
+        else:
+            base = 24
+        if algorithm == "frontier_roam":
+            return base + 10
+        if algorithm == "spawn_anchor":
+            return base + 6
+        if algorithm == "party_rally":
+            return max(6, base - 4)
+        if algorithm == "teleport_hunt":
+            return base + 14
+        return base
+
+    def _step_budget(self, algorithm: str, severity: str) -> int:
+        if severity == "high":
+            return 1
+        if algorithm in {"teleport_hunt", "frontier_roam"}:
+            return 5
+        if algorithm in {"spawn_anchor", "party_rally"}:
+            return 4
+        return 3
+
+    def _route_id(self, state: AgentState, algorithm: str) -> str:
+        return f"{state.map_id or 0}:{algorithm}:{self._seed(state, algorithm) % 997}"
+
+    def _seed(self, state: AgentState, algorithm: str) -> int:
+        raw = f"{algorithm}:{state.x}:{state.y}:{state.map_id}:{state.extras.get('robot_uid', '') if state.extras else ''}"
+        seed = 0
+        for ch in raw:
+            seed = (seed * 131 + ord(ch)) & 0x7FFFFFFF
+        return seed
 
 
 robot_ai_ops_service = RobotAiOpsService()

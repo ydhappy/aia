@@ -3,5 +3,6 @@
 .pytest_cache/
 __pycache__/
 *.py[cod]
+*.class
 aia_bridge.db
 runtime/

@@ -29,6 +29,12 @@ public class RobotStateExtractor {
         public int potionCount;
         public boolean underAttack;
         public boolean canTeleport;
+        public int level;
+        public int robotUid;
+        public int localAreaLevel;
+        public int nearbyMonsterMaxLevel;
+        public boolean dangerHotspot;
+        public boolean teleportHuntEnabled;
     }
 
     public String toDecideJson(RobotSnapshot s) {
@@ -47,7 +53,17 @@ public class RobotStateExtractor {
                 + "\"weight_percent\":" + s.weightPercent + ","
                 + "\"inventory\":{\"potion\":" + s.potionCount + "},"
                 + "\"is_under_attack\":" + s.underAttack + ","
-                + "\"can_teleport\":" + s.canTeleport
+                + "\"can_teleport\":" + s.canTeleport + ","
+                + "\"extras\":{"
+                + "\"level\":" + s.level + ","
+                + "\"robot_level\":" + s.level + ","
+                + "\"robot_uid\":" + s.robotUid + ","
+                + "\"actor_kind\":\"robot\","
+                + "\"local_area_level\":" + s.localAreaLevel + ","
+                + "\"nearby_monster_max_level\":" + s.nearbyMonsterMaxLevel + ","
+                + "\"danger_hotspot\":" + s.dangerHotspot + ","
+                + "\"teleport_hunt_enabled\":" + s.teleportHuntEnabled
+                + "}"
                 + "}"
                 + "}";
     }
@@ -85,6 +101,12 @@ public class RobotStateExtractor {
         s.potionCount = 0;
         s.underAttack = false;
         s.canTeleport = true;
+        s.level = 1;
+        s.robotUid = 0;
+        s.localAreaLevel = 0;
+        s.nearbyMonsterMaxLevel = 0;
+        s.dangerHotspot = false;
+        s.teleportHuntEnabled = true;
 
         return s;
     }

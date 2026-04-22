@@ -50,6 +50,10 @@ public class LocalAiaClient {
         return postJson("/api/v1/robot/sync", json);
     }
 
+    public String opsTick(String json) throws IOException {
+        return postJson("/api/v1/robot/ops-tick", json);
+    }
+
     public String feedback(String json) throws IOException {
         return postJson("/robot/feedback", json);
     }

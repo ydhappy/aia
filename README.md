@@ -56,8 +56,10 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 - `POST /observe`
 - `POST /decide`
 - `POST /api/v1/robot/sync`
+- `POST /api/v1/robot/ops-tick`
 - rule-engine 우선, LLM은 보조
 - growth stage / anomaly / meta policy 반영
+- AIA 네비게이션 응답에 `points`, `route_id`, `spread_radius`, `server_validation` 포함
 
 ### 로봇 지식 / 학습 / 성장
 - `POST /robot/profile`
@@ -82,6 +84,8 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 - `GET /metrics`
 - `/admin/*`
 - `/dashboard/*`
+- `GET /dashboard/robot-ai`
+- `GET /dashboard/robot-ai/gui`
 - `/alerts/*`
 - `/ops/*`
 - `/scale/*`
@@ -100,6 +104,15 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 - MBTI / 세대 / 말투 / 줄임말 / 밈 계층
 - 반말 / 존댓말 / 반존댓말 / 줄임말 / 밈 톤 지원
 - `GET /goal/{agent_id}` 응답에 `persona`, `talk` 포함
+
+---
+
+## 2-1. AIA Robot Ops Core
+
+로봇 운영 기준 계약은 `docs/aia-robot-ops-core.md`입니다.
+게임서버는 센서 전송과 최종 실행 검증만 유지하고, AIA가 정책 판단, 네비게이션 전략, 학습/성장, 토크, 운영 체크리스트를 담당합니다.
+
+다른 서버는 우선 `POST /api/v1/robot/ops-tick` 하나만 붙여도 profile, event, observe, decide, feedback, dashboard 요약을 한 번에 연동할 수 있습니다.
 
 ---
 
@@ -237,6 +250,7 @@ DB_BRIDGE_MYSQL_DSN=mysql+pymysql://user:password@127.0.0.1:3306/your_database
 - `POST /observe`
 - `POST /decide`
 - `POST /api/v1/robot/sync`
+- `POST /api/v1/robot/ops-tick`
 
 ### 로봇 데이터
 - `POST /robot/profile`

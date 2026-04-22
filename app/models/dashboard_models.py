@@ -42,5 +42,7 @@ class RobotAiOpsDashboardResponse(BaseModel):
     navigation_algorithms: list[str] = Field(default_factory=list)
     runtime_layers: list[str] = Field(default_factory=list)
     server_minimal_contract: dict[str, Any] = Field(default_factory=dict)
+    navigation_contract: dict[str, Any] = Field(default_factory=dict)
+    quality_gates: list[dict[str, Any]] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)
     learning_summary: dict[str, Any] = Field(default_factory=dict)
