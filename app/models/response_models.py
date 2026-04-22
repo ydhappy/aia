@@ -35,6 +35,9 @@ class MetricsResponse(BaseModel):
     total_fallbacks: int
     total_profiles_saved: int
     total_events_saved: int
+    total_learning_digests: int = 0
+    total_learning_records: int = 0
+    total_learning_issues: int = 0
 
 
 class RobotProfileResponse(BaseModel):
@@ -70,3 +73,16 @@ class RobotFeedbackResponse(BaseModel):
 class RobotLearningStateResponse(BaseModel):
     agent_id: str
     learning_state: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotLearningDigestResponse(BaseModel):
+    accepted: bool = True
+    processed_records: int = 0
+    processed_talk_memories: int = 0
+    delete_uids: list[int] = Field(default_factory=list)
+    issue_count: int = 0
+    issues: list[dict[str, Any]] = Field(default_factory=list)
+    learning_updates: int = 0
+    growth_updates: int = 0
+    talk_updates: int = 0
+    message: str = "learning digest applied"

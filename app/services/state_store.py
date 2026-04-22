@@ -49,11 +49,26 @@ class InMemoryStateStore:
     def get_learning_state(self, agent_id: str) -> dict[str, Any]:
         return self._learning.get(agent_id, {})
 
+    def list_agent_ids(self) -> list[str]:
+        ids = set(self._states.keys())
+        ids.update(self._profiles.keys())
+        ids.update(self._events.keys())
+        ids.update(self._traces.keys())
+        return sorted(ids)
+
+    def list_learning_ids(self) -> list[str]:
+        return sorted(self._learning.keys())
+
     def increment_decide(self) -> None:
         self._metrics["total_decide_requests"] += 1
 
     def increment_fallback(self) -> None:
         self._metrics["total_fallbacks"] += 1
+
+    def increment_learning_digest(self, records: int, issues: int) -> None:
+        self._metrics["total_learning_digests"] += 1
+        self._metrics["total_learning_records"] += max(0, int(records or 0))
+        self._metrics["total_learning_issues"] += max(0, int(issues or 0))
 
     def metrics(self) -> dict[str, int]:
         return {
@@ -62,6 +77,9 @@ class InMemoryStateStore:
             "total_fallbacks": self._metrics["total_fallbacks"],
             "total_profiles_saved": self._metrics["total_profiles_saved"],
             "total_events_saved": self._metrics["total_events_saved"],
+            "total_learning_digests": self._metrics["total_learning_digests"],
+            "total_learning_records": self._metrics["total_learning_records"],
+            "total_learning_issues": self._metrics["total_learning_issues"],
         }
 
 

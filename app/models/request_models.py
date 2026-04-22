@@ -18,6 +18,7 @@ class AgentState(BaseModel):
     nearby_allies: int = Field(default=0, ge=0)
     safe_zone: bool = False
     can_teleport: bool = False
+    must_use_hp_item: bool = False
     weight_percent: int | None = Field(default=None, ge=0, le=100)
     cooldowns: dict[str, int] = Field(default_factory=dict)
     inventory: dict[str, int] = Field(default_factory=dict)
@@ -76,3 +77,39 @@ class RobotFeedbackRequest(BaseModel):
     reward: float = 0.0
     outcome: Literal["success", "partial", "failure"] = "partial"
     context: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotActionRecord(BaseModel):
+    uid: int = Field(ge=0)
+    agent_id: str
+    robot_uid: int | None = Field(default=None, ge=0)
+    object_id: int | None = Field(default=None, ge=0)
+    name: str | None = None
+    action_type: str
+    detail: str | None = None
+    loc_x: int = 0
+    loc_y: int = 0
+    loc_map: int = 0
+    created_at: int = Field(default=0, ge=0)
+
+
+class RobotTalkMemoryRecord(BaseModel):
+    robot_uid: int = Field(ge=0)
+    agent_id: str
+    target_name: str | None = None
+    target_kind: Literal["pc", "robot"] = "pc"
+    familiarity: int = Field(default=0, ge=0, le=100)
+    conversation_count: int = Field(default=0, ge=0)
+    tone: str | None = None
+    recent_topic: str | None = None
+    last_message: str | None = None
+    updated_at: int = Field(default=0, ge=0)
+
+
+class RobotLearningDigestRequest(BaseModel):
+    server_name: str = "unknown"
+    tick: int = Field(default=0, ge=0)
+    reason: str = "periodic"
+    records: list[RobotActionRecord] = Field(default_factory=list)
+    talk_memories: list[RobotTalkMemoryRecord] = Field(default_factory=list)
+    delete_after_apply: bool = True

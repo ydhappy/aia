@@ -116,29 +116,28 @@ class AutomationService:
                 "goal": goal,
                 "phase": phase,
             }
-        if phase == "field_collection":
-            return {
-                "mode": "loot_loop",
-                "objective": "collect_resources",
-                "goal": goal,
-                "phase": phase,
-            }
-        if phase == "support_loop":
-            return {
-                "mode": "support_loop",
-                "objective": "follow_and_support_party",
-                "goal": goal,
-                "phase": phase,
-            }
-        if phase == "combat_loop":
-            return {
-                "mode": "farm",
-                "objective": "combat_and_progress",
-                "goal": goal,
-                "phase": phase,
-            }
-
         if not active_task:
+            if phase == "field_collection":
+                return {
+                    "mode": "loot_loop",
+                    "objective": "collect_resources",
+                    "goal": goal,
+                    "phase": phase,
+                }
+            if phase == "support_loop":
+                return {
+                    "mode": "support_loop",
+                    "objective": "follow_and_support_party",
+                    "goal": goal,
+                    "phase": phase,
+                }
+            if phase == "combat_loop":
+                return {
+                    "mode": "farm",
+                    "objective": "combat_and_progress",
+                    "goal": goal,
+                    "phase": phase,
+                }
             return {
                 "mode": "idle",
                 "reason": "no_active_automation_task",

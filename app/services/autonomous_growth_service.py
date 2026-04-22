@@ -32,6 +32,14 @@ class AutonomousGrowthService:
         if "retreat_timing_bad" in failure_tags[-5:]:
             runtime_bias["retreat_bonus"] = max(int(runtime_bias.get("retreat_bonus", 0)), 5)
             runtime_bias["risk_mode"] = "safe"
+            runtime_bias["move_mode"] = "kite"
+        if "survival_failure" in failure_tags[-8:] or "dangerous_hunt_area" in failure_tags[-8:]:
+            runtime_bias["retreat_bonus"] = max(int(runtime_bias.get("retreat_bonus", 0)), 8)
+            runtime_bias["risk_mode"] = "safe"
+            runtime_bias["avoid_hotspot"] = True
+        if "movement_stall" in failure_tags[-8:] or "path_blocked" in failure_tags[-8:]:
+            runtime_bias["move_mode"] = "wide_patrol"
+            runtime_bias["pathing_mode"] = "avoid_repeat"
         if "inventory_management_bad" in failure_tags[-5:]:
             runtime_bias["inventory_mode"] = "strict"
         if mastery.get("support", 0.0) > mastery.get("fighter", 0.0):

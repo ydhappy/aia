@@ -2,16 +2,19 @@ from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
 from app.models.request_models import RobotEventRequest, RobotFeedbackRequest, RobotProfileRequest
+from app.models.request_models import RobotLearningDigestRequest
 from app.models.response_models import (
     AgentTraceResponse,
     RobotEventResponse,
     RobotFeedbackResponse,
     RobotKnowledgeResponse,
+    RobotLearningDigestResponse,
     RobotLearningStateResponse,
     RobotProfileResponse,
 )
 from app.services.agent_service import agent_service
 from app.services.learning_service import learning_service
+from app.services.robot_learning_digest_service import robot_learning_digest_service
 from app.services.store_factory import store
 
 
@@ -33,6 +36,16 @@ def save_event(request: RobotEventRequest) -> RobotEventResponse:
 @router.post("/feedback", response_model=RobotFeedbackResponse)
 def submit_feedback(request: RobotFeedbackRequest) -> RobotFeedbackResponse:
     return learning_service.submit_feedback(request)
+
+
+@router.post("/learning/digest", response_model=RobotLearningDigestResponse)
+def apply_learning_digest(request: RobotLearningDigestRequest) -> RobotLearningDigestResponse:
+    return robot_learning_digest_service.apply_digest(request)
+
+
+@router.get("/learning/summary")
+def learning_summary() -> dict:
+    return robot_learning_digest_service.summary()
 
 
 @router.get("/{agent_id}", response_model=RobotKnowledgeResponse)

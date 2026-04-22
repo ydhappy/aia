@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.config import settings
@@ -18,7 +18,7 @@ class LearningJournalService:
             return {"stored": False, "reason": "disabled"}
         agent_dir = self.base_path / agent_id
         agent_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
         target = agent_dir / f"{stamp}.json"
         target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         self._trim(agent_dir)

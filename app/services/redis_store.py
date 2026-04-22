@@ -14,6 +14,9 @@ class RedisStore:
             "total_fallbacks": 0,
             "total_profiles_saved": 0,
             "total_events_saved": 0,
+            "total_learning_digests": 0,
+            "total_learning_records": 0,
+            "total_learning_issues": 0,
         }
 
     def _key(self, prefix: str, agent_id: str) -> str:
@@ -59,11 +62,28 @@ class RedisStore:
         raw = self.client.get(self._key("learning", agent_id))
         return json.loads(raw) if raw else {}
 
+    def list_agent_ids(self) -> list[str]:
+        ids = set()
+        for prefix in ("state", "profile", "events", "trace"):
+            marker = f"aia:{prefix}:"
+            for key in self.client.scan_iter(f"{marker}*"):
+                ids.add(str(key).replace(marker, "", 1))
+        return sorted(ids)
+
+    def list_learning_ids(self) -> list[str]:
+        marker = "aia:learning:"
+        return sorted(str(key).replace(marker, "", 1) for key in self.client.scan_iter(f"{marker}*"))
+
     def increment_decide(self) -> None:
         self._metrics["total_decide_requests"] += 1
 
     def increment_fallback(self) -> None:
         self._metrics["total_fallbacks"] += 1
+
+    def increment_learning_digest(self, records: int, issues: int) -> None:
+        self._metrics["total_learning_digests"] += 1
+        self._metrics["total_learning_records"] += max(0, int(records or 0))
+        self._metrics["total_learning_issues"] += max(0, int(issues or 0))
 
     def metrics(self) -> dict:
         return dict(self._metrics)

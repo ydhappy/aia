@@ -57,6 +57,8 @@ class AgentService:
         recent_events = store.get_recent_events(request.agent_id)
         learning_state = store.get_learning_state(request.agent_id)
         growth_state = growth_service.get_growth_state(request.agent_id).model_dump()
+        autogrowth_state = store.get_learning_state(f"autogrowth::{request.agent_id}") or {}
+        runtime_bias = autogrowth_state.get("runtime_bias", {}) if isinstance(autogrowth_state, dict) else {}
 
         group_key = profile.get("party_id") or profile.get("role")
         if group_key:
@@ -64,6 +66,8 @@ class AgentService:
             learning_state = {**learning_state, **{k: v for k, v in merged_learning.items() if k in ["preferred_action", "avoid_action"]}}
 
         override_info = runtime_overrides.get_override(profile, request.state.model_dump())
+        if runtime_bias:
+            override_info = {**override_info, "runtime_bias": runtime_bias}
 
         trace = agent_graph.run(
             agent_id=request.agent_id,
@@ -75,6 +79,7 @@ class AgentService:
         anomalies = anomaly_detection_service.detect(trace, growth_state)
         meta_policy = meta_policy_service.select_strategy(profile, growth_state, anomalies)
         trace["runtime_override"] = override_info
+        trace["runtime_bias"] = runtime_bias
         trace["growth_state"] = growth_state
         trace["anomalies"] = anomalies
         trace["meta_policy"] = meta_policy

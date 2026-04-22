@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import HTMLResponse
 
 from app.core.security import verify_api_key
-from app.models.dashboard_models import AgentFilterResult, DashboardCountsResponse, ShardAssignmentResponse
+from app.models.dashboard_models import (
+    AgentFilterResult,
+    DashboardCountsResponse,
+    RobotAiOpsDashboardResponse,
+    ShardAssignmentResponse,
+)
 from app.services.dashboard_service import dashboard_service
 from app.services.rebalance_service import rebalance_service
+from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.shard_balancer_service import shard_balancer_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
@@ -47,3 +54,13 @@ def validate_world_profile(world_id: str) -> dict:
     profile = world_profile_service.load(world_id)
     validation = world_profile_validator.validate(profile)
     return {"world_id": world_id, "validation": validation, "profile": profile}
+
+
+@router.get("/robot-ai", response_model=RobotAiOpsDashboardResponse)
+def robot_ai_dashboard(agent_ids: list[str] = Query(default=[])) -> RobotAiOpsDashboardResponse:
+    return robot_ai_ops_service.dashboard_snapshot(agent_ids)
+
+
+@router.get("/robot-ai/gui", response_class=HTMLResponse)
+def robot_ai_dashboard_gui(agent_ids: list[str] = Query(default=[])) -> HTMLResponse:
+    return HTMLResponse(robot_ai_ops_service.render_dashboard_html(agent_ids))
