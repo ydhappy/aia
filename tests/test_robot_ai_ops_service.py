@@ -48,6 +48,46 @@ def test_policy_uses_ops_risk_for_retreat() -> None:
     assert decision.action_args["risk_score"] >= 55
 
 
+def test_ops_assessment_detects_repeat_death_profile() -> None:
+    state = AgentState(
+        hp=82,
+        mp=20,
+        x=33094,
+        y=32362,
+        map_id=4,
+        can_teleport=True,
+        inventory={},
+        extras={
+            "level": 11,
+            "learning_death_count": 3,
+            "learning_caution": 5,
+            "learning_confidence": 13,
+            "recent_death_burst": 0,
+        },
+    )
+    assessment = robot_ai_ops_service.assess_state(state)
+    decision = policy_engine.decide(state)
+    assert "repeat_death_profile:3/5" in assessment["reasons"]
+    assert decision.action == "RETREAT"
+    assert decision.action_args["nav_algorithm"] == "danger_retreat"
+
+
+def test_policy_uses_available_potion_when_hp_below_95() -> None:
+    state = AgentState(
+        hp=94,
+        mp=20,
+        x=33094,
+        y=32362,
+        map_id=4,
+        must_use_hp_item=True,
+        inventory={"potion": 3},
+    )
+    decision = policy_engine.decide(state)
+    assert decision.action == "USE_SKILL"
+    assert decision.action_args["item"] == "potion"
+    assert decision.reason == "hp_below_95_use_available_potion"
+
+
 def test_policy_returns_diverse_navigation_when_no_target() -> None:
     state = AgentState(
         hp=90,

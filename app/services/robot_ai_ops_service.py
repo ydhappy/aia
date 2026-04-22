@@ -35,6 +35,10 @@ class RobotAiOpsService:
         stuck_ms = self._to_int(extras.get("stuck_ms"), 0)
         danger_hotspot = self._to_bool(extras.get("danger_hotspot"))
         nav_fail_count = self._to_int(extras.get("nav_fail_count"), 0)
+        learning_deaths = self._to_int(extras.get("learning_death_count"), 0)
+        learning_caution = self._to_int(extras.get("learning_caution"), 0)
+        learning_confidence = self._to_int(extras.get("learning_confidence"), 0)
+        recent_death_burst = self._to_int(extras.get("recent_death_burst"), 0)
         actor_kind = str(extras.get("actor_kind") or "robot")
 
         risk_score = 0
@@ -73,6 +77,24 @@ class RobotAiOpsService:
         if state.weight_percent is not None and state.weight_percent >= 85:
             risk_score += 16
             reasons.append("overweight")
+        if recent_death_burst > 0:
+            risk_score += 45
+            reasons.append(f"recent_death_burst:{recent_death_burst}")
+        if learning_deaths >= 3 and learning_caution >= 5:
+            risk_score += 56
+            reasons.append(f"repeat_death_profile:{learning_deaths}/{learning_caution}")
+        elif learning_deaths >= 3:
+            risk_score += 16
+            reasons.append(f"death_history:{learning_deaths}")
+        elif learning_caution >= 6:
+            risk_score += 14
+            reasons.append(f"caution_profile:{learning_caution}")
+        if learning_confidence <= -4:
+            risk_score += 12
+            reasons.append(f"low_learning_confidence:{learning_confidence}")
+        if state.hp <= 70 and (learning_caution >= 5 or learning_deaths >= 3):
+            risk_score += 22
+            reasons.append("fragile_profile_hp_pressure")
 
         severity = "high" if risk_score >= 55 else "medium" if risk_score >= 28 else "low"
         return {
@@ -82,6 +104,10 @@ class RobotAiOpsService:
             "target_level": target_level,
             "nearby_monster_max_level": nearby_max_level,
             "danger_hotspot": danger_hotspot,
+            "learning_death_count": learning_deaths,
+            "learning_caution": learning_caution,
+            "learning_confidence": learning_confidence,
+            "recent_death_burst": recent_death_burst,
             "risk_score": min(100, risk_score),
             "severity": severity,
             "reasons": reasons,

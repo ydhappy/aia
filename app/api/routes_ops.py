@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
 from app.services.memory_summary_service import memory_summary_service
+from app.services.open_agent_provider_service import open_agent_provider_service
 from app.services.scheduler_service import scheduler_service
 
 
@@ -16,3 +17,11 @@ def run_scheduler(agent_ids: list[str]) -> dict:
 @router.get("/memory/{agent_id}")
 def memory_summary(agent_id: str) -> dict:
     return memory_summary_service.summarize_agent(agent_id)
+
+
+@router.get("/open-agent-providers")
+def open_agent_providers() -> dict:
+    return {
+        "providers": open_agent_provider_service.providers(),
+        "plan": open_agent_provider_service.absorption_plan(),
+    }

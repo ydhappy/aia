@@ -36,6 +36,23 @@
 - `LLM_MODEL=your-local-model-name`
 - `LLM_API_KEY=` 선택
 
+## 오픈소스 에이전트 흡수 원칙
+
+AIA는 외부 프레임워크 코드를 기본으로 vendoring하지 않습니다. 대신 `/ops/open-agent-providers`에서 지원 후보와 흡수 계획을 노출하고, 외부 런타임은 sidecar로 연결합니다.
+
+권장 흡수 순서:
+- 1순위: AIA Native Autonomy Core는 항상 최종 정책 계층으로 유지합니다.
+- 2순위: Ollama/OpenAI-compatible 런타임은 LLM 추론 sidecar로 연결합니다.
+- 3순위: LangGraph 또는 Microsoft Agent Framework는 장기 운영/멀티에이전트 sidecar로 연결합니다.
+- 4순위: CrewAI는 역할 기반 워크플로 sidecar로 선택 적용합니다.
+- 참고: AutoGen은 maintenance-mode로 확인되므로 신규 핵심 의존성으로 삼지 않고 패턴/마이그레이션 참고용으로 둡니다.
+
+안전 규칙:
+- 외부 에이전트는 게임 액션을 직접 실행하지 않습니다.
+- 외부 에이전트는 runtime_bias, 장기 계획, 체크리스트 제안만 작성합니다.
+- 최종 판단은 AIA policy engine이 수행합니다.
+- 최종 실행 검증은 게임 서버가 수행합니다.
+
 ## 장점
 - 외부 API 비용/의존성 감소
 - 데이터가 내부망에 머무름

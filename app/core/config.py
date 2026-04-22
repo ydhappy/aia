@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     llm_provider: str = "generic"
     llm_max_parallel_requests: int = 8
     llm_disable_for_bulk_scale: bool = True
+    agent_framework_provider: str = "native"
+    agent_framework_enabled: bool = False
+    agent_framework_base_url: str = ""
+    agent_framework_timeout_seconds: float = 5.0
 
     state_store_mode: str = "memory"
     redis_url: str = "redis://localhost:6379/0"

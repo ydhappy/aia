@@ -73,6 +73,15 @@ class PolicyEngine:
                 source="rule_engine",
             ), effective_learning)
 
+        if state.must_use_hp_item and potion_count > 0:
+            return adaptive_policy.adjust(DecideResponse(
+                action="USE_SKILL",
+                action_args=self._with_navigation({"skill": "heal", "item": "potion", "target": "self", "growth_stage": growth_stage}, navigation_plan),
+                confidence=0.93,
+                reason="hp_below_95_use_available_potion",
+                source="rule_engine",
+            ), effective_learning)
+
         if state.must_use_hp_item and runtime_bias.get("inventory_mode") == "strict" and not state.safe_zone:
             return adaptive_policy.adjust(DecideResponse(
                 action="RETREAT",
