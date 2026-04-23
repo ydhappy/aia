@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.models.request_models import AgentState
+from app.services.server_context_service import server_context_service
 
 
 class RobotAutonomyBaselineService:
@@ -17,8 +18,11 @@ class RobotAutonomyBaselineService:
 
     def __init__(self) -> None:
         self.config_path = Path(__file__).resolve().parents[1] / "config" / "robot_autonomy_defaults.json"
+        self.top_profile_path = Path(__file__).resolve().parents[1] / "config" / "aia_robot_top_profile.json"
         self._cache: dict[str, Any] | None = None
         self._cache_mtime: float = -1.0
+        self._top_cache: dict[str, Any] | None = None
+        self._top_cache_mtime: float = -1.0
 
     def load(self, force: bool = False) -> dict[str, Any]:
         if not self.config_path.exists():
@@ -47,16 +51,32 @@ class RobotAutonomyBaselineService:
 
     def operator_view(self) -> dict[str, Any]:
         config = self.load()
+        top_profile = self.load_top_profile()
+        top_zones = self._top_profile_zones(top_profile)
+        server_context = server_context_service.snapshot()
+        world_guides = server_context.get("world_guides", {}) if isinstance(server_context, dict) else {}
         return {
             "config_path": str(self.config_path),
+            "top_profile_path": str(self.top_profile_path),
             "no_db_required": True,
             "operator_editable": True,
+            "server_context": server_context,
             "summary": {
                 "hunt_zones": len(self._enabled_zones(config)),
                 "class_profiles": len(config.get("class_profiles", {}) or {}),
                 "talk_topics": len(config.get("talk_templates", {}) or {}),
+                "aia_top_zones": len(top_zones),
+                "aia_db_hunt_zones": int(world_guides.get("hunt_zone_count", 0) or 0),
+                "aia_db_siege_guides": int(world_guides.get("siege_guide_count", 0) or 0),
+                "aia_party_spawn_groups": len(top_profile.get("party_spawn_groups", {}) or {}),
+                "aia_pvp_zones": len(top_profile.get("pvp_zones", []) or []),
+                "aia_pickup_zones": len(top_profile.get("pickup_zones", []) or []),
             },
             "config": config,
+            "aia_top_profile": {
+                "loaded": bool(top_profile),
+                "behavior_constants": top_profile.get("behavior_constants", {}),
+            },
         }
 
     def resolve_profile(
@@ -92,7 +112,9 @@ class RobotAutonomyBaselineService:
         metadata = dict(resolved.get("metadata") or {})
         metadata["autonomy_source"] = "aia_default_baseline"
         metadata["operator_config_path"] = str(self.config_path)
-        metadata["no_robot_book_required"] = True
+        metadata["aia_top_profile_path"] = str(self.top_profile_path)
+        metadata["aia_top_profile_loaded"] = bool(self.load_top_profile())
+        metadata["aia_autonomy_without_book_table"] = True
         metadata["no_talk_table_required"] = True
         metadata["class_key"] = class_key
         if zone:
@@ -179,7 +201,7 @@ class RobotAutonomyBaselineService:
         profile = profile or {}
         learning_state = learning_state or {}
         assessment = assessment or {}
-        templates = config.get("talk_templates", {}) if isinstance(config.get("talk_templates"), dict) else {}
+        templates = self._merged_talk_templates(config)
         topic = self._talk_topic(state, learning_state, assessment)
         candidates = templates.get(topic) or templates.get("hunt") or ["상황을 보고 다음 행동을 정하겠습니다."]
         seed = self._seed(agent_id, state, topic)
@@ -209,11 +231,83 @@ class RobotAutonomyBaselineService:
             "aia_memory": "keep_in_state_store_or_redis",
         }
 
+    def load_top_profile(self, force: bool = False) -> dict[str, Any]:
+        if not self.top_profile_path.exists():
+            return {}
+        mtime = self.top_profile_path.stat().st_mtime
+        if not force and self._top_cache is not None and mtime == self._top_cache_mtime:
+            return self._top_cache
+        try:
+            loaded = json.loads(self.top_profile_path.read_text(encoding="utf-8"))
+        except Exception:
+            loaded = {}
+        if not isinstance(loaded, dict):
+            loaded = {}
+        self._top_cache = loaded
+        self._top_cache_mtime = mtime
+        return loaded
+
     def _enabled_zones(self, config: dict[str, Any]) -> list[dict[str, Any]]:
         zones = config.get("hunt_zones", [])
-        if not isinstance(zones, list):
+        merged: list[dict[str, Any]] = []
+        if isinstance(zones, list):
+            merged.extend(dict(zone) for zone in zones if isinstance(zone, dict) and zone.get("enabled", True))
+        merged.extend(self._top_profile_zones(self.load_top_profile()))
+        merged.extend(server_context_service.world_hunt_zones())
+        return merged
+
+    def _top_profile_zones(self, profile: dict[str, Any]) -> list[dict[str, Any]]:
+        if not isinstance(profile, dict) or not profile:
             return []
-        return [dict(zone) for zone in zones if isinstance(zone, dict) and zone.get("enabled", True)]
+        zones: list[dict[str, Any]] = []
+        raw_zones = profile.get("hunt_zones", [])
+        if isinstance(raw_zones, list):
+            zones.extend(dict(zone) for zone in raw_zones if isinstance(zone, dict) and zone.get("enabled", True))
+        groups = profile.get("hunt_zone_groups", [])
+        if isinstance(groups, list):
+            for group in groups:
+                if not isinstance(group, dict) or not group.get("enabled", True):
+                    continue
+                anchors = group.get("anchors", [])
+                if not isinstance(anchors, list):
+                    continue
+                for index, anchor in enumerate(anchors, start=1):
+                    if not isinstance(anchor, list) or len(anchor) < 4:
+                        continue
+                    x = self._to_int(anchor[0], 0)
+                    y = self._to_int(anchor[1], 0)
+                    map_id = self._to_int(anchor[2], 0)
+                    min_level = self._to_int(anchor[3], 1)
+                    zones.append({
+                        "id": f"{group.get('id', 'aia_zone')}_{index:03d}",
+                        "name": f"{group.get('name', 'AIA 권역')}#{index:03d}",
+                        "type": group.get("type", "field"),
+                        "map_id": map_id,
+                        "x": x,
+                        "y": y,
+                        "min_level": min_level,
+                        "max_level": self._to_int(group.get("max_level"), max(min_level + 24, 30)),
+                        "radius": self._to_int(group.get("radius"), 36),
+                        "teleport": bool(group.get("teleport", True)),
+                        "enabled": True,
+                        "source": "aia_top",
+                    })
+        return zones
+
+    def _merged_talk_templates(self, config: dict[str, Any]) -> dict[str, list[str]]:
+        merged: dict[str, list[str]] = {}
+        base = config.get("talk_templates", {}) if isinstance(config.get("talk_templates"), dict) else {}
+        top = self.load_top_profile().get("talk_templates", {})
+        for source in (base, top if isinstance(top, dict) else {}):
+            for key, value in source.items():
+                if not isinstance(value, list):
+                    continue
+                bucket = merged.setdefault(str(key), [])
+                for item in value:
+                    text = str(item).strip()
+                    if text and text not in bucket:
+                        bucket.append(text)
+        return merged
 
     def _learned_zone(self, state: AgentState | None, learning_state: dict[str, Any]) -> dict[str, Any]:
         if state is None:

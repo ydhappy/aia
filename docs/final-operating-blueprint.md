@@ -35,12 +35,11 @@
 - db bridge
 
 ## DB 중심 운영
-- robot_state
-- robot_event
-- robot_feedback
-- robot_task
-- robot_decision
-- robot_trace_summary
+- `robot`, `robot_clan`, `robot_setting`: 서버 운영자가 직접 관리하는 최소 로봇 테이블
+- `aia_robot_state`, `aia_robot_event`, `aia_robot_issue`: AIA가 읽고 정리하는 실시간 상태/이벤트/이슈
+- `aia_robot_learning`, `aia_robot_stall`, `aia_robot_autofix`, `aia_robot_metric`: AIA 학습/복구/운영 지표
+- `aia_world_hunt_guide`, `aia_world_siege_guide`: 서버 스폰/공성 정보를 AIA가 이해한 월드 가이드
+- `aia_robot_feedback`, `aia_robot_decision`, `aia_robot_trace_summary`: 외부 서버 연동용 선택 테이블
 
 ## 키 운영
 - 서버 <-> AIA 운영 통신용 API key 1개

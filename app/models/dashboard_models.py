@@ -31,7 +31,7 @@ class RobotAiChecklistItem(BaseModel):
 
 
 class RobotAiOpsDashboardResponse(BaseModel):
-    system_name: str = "AIA Robot Autonomy Core"
+    system_name: str = "AIA 로봇 자율운영 코어"
     dependency_score: int = Field(default=0, ge=0, le=120)
     mode: str = "aia_first_server_minimal"
     total_agents: int = 0

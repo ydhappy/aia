@@ -19,7 +19,7 @@ public class DbDecisionPoller {
     public String latestDecisionAction(String agentId) throws Exception {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
             PreparedStatement ps = conn.prepareStatement(
-                    "SELECT action FROM robot_decision WHERE agent_id = ? ORDER BY id DESC LIMIT 1"
+                    "SELECT action FROM aia_robot_decision WHERE agent_id = ? ORDER BY uid DESC LIMIT 1"
             );
             ps.setString(1, agentId);
             ResultSet rs = ps.executeQuery();

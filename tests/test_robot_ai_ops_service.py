@@ -48,6 +48,55 @@ def test_policy_uses_ops_risk_for_retreat() -> None:
     assert decision.action_args["risk_score"] >= 55
 
 
+def test_beginner_talking_island_field_does_not_over_retreat() -> None:
+    state = AgentState(
+        hp=96,
+        mp=20,
+        x=32513,
+        y=33004,
+        map_id=0,
+        can_teleport=False,
+        target_id="training_mob",
+        target_distance=3,
+        inventory={"infinite_healing_potion": 1},
+        extras={
+            "level": 1,
+            "robot_level": 1,
+            "local_area_level": 21,
+            "target_level": 6,
+            "nearby_monster_max_level": 14,
+            "fresh_talking_island_start": True,
+        },
+    )
+
+    assessment = robot_ai_ops_service.assess_state(state)
+    decision = policy_engine.decide(state)
+
+    assert assessment["severity"] != "high"
+    assert assessment["should_retreat"] is False
+    assert "beginner_training_leniency" in assessment["reasons"]
+    assert decision.action in {"MOVE", "ATTACK"}
+
+
+def test_aia_escape_policy_marks_under_attack_hp_pressure() -> None:
+    state = AgentState(
+        hp=69,
+        mp=20,
+        x=32611,
+        y=32840,
+        map_id=0,
+        is_under_attack=True,
+        safe_zone=False,
+        must_use_hp_item=True,
+        extras={"level": 20, "class_name": "knight", "robot_uid": 900},
+    )
+
+    assessment = robot_ai_ops_service.assess_state(state)
+
+    assert any(reason.startswith("aia_escape_policy") for reason in assessment["reasons"])
+    assert assessment["risk_score"] >= 50
+
+
 def test_ops_assessment_detects_repeat_death_profile() -> None:
     state = AgentState(
         hp=82,
@@ -169,7 +218,7 @@ def test_ops_uses_siege_attack_when_giran_war_is_active() -> None:
     assert decision.action_args["points"][0]["map_id"] == 4
 
 
-def test_ops_uses_dungeon_sweep_without_robot_book() -> None:
+def test_ops_uses_dungeon_sweep_from_aia_baseline() -> None:
     state = AgentState(
         hp=92,
         mp=30,
@@ -193,9 +242,9 @@ def test_dashboard_snapshot_contains_checklist() -> None:
     assert snapshot.total_agents == 1
     assert snapshot.active_agents == 1
     assert snapshot.dependency_score > 0
-    assert {item.key for item in snapshot.checklist} >= {"bridge", "dashboard", "navigation", "issues", "aia_default_baseline", "log_cleanup"}
+    assert {item.key for item in snapshot.checklist} >= {"bridge", "dashboard", "navigation", "issues", "aia_default_baseline", "aia_top_profile", "log_cleanup"}
     assert snapshot.navigation_contract["anti_clump_rule"]
     assert snapshot.navigation_contract["bookless_rule"]
     assert snapshot.autonomy_baseline["no_db_required"] is True
     assert snapshot.cleanup_policy["talk_memories"] == "delete_after_digest_apply_when_last_message_was_learned"
-    assert {gate["key"] for gate in snapshot.quality_gates} >= {"compile", "runtime", "fallback", "dashboard"}
+    assert {gate["key"] for gate in snapshot.quality_gates} >= {"compile", "runtime", "fallback", "dashboard", "aia_top"}

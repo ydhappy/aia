@@ -4,58 +4,44 @@
 게임 서버는 최소한의 상태/이벤트/피드백만 DB에 기록하고, AIA가 DB를 중심으로 판단과 운영 기능을 수행하는 구조를 정리합니다.
 
 ## 권장 테이블 축
-- robot_state
-- robot_event
-- robot_feedback
-- robot_task
-- robot_decision
-- robot_trace_summary
+- `aia_robot_state`
+- `aia_robot_event`
+- `aia_robot_feedback`
+- `aia_robot_decision`
+- `aia_robot_trace_summary`
 
 ## 최소 컬럼 예시
-### robot_state
-- agent_id
-- tick
+### aia_robot_state
+- robot_uid
+- name
 - hp
 - mp
-- x
-- y
-- map_id
-- target_id
-- target_distance
-- safe_zone
-- weight_percent
+- hp_percent
+- ai_status
+- mode
+- mode_label
 - updated_at
 
-### robot_event
-- agent_id
-- tick
-- event_type
-- severity
-- message
-- payload_json
+### aia_robot_event
+- object_id
+- name
+- action_type
+- detail
+- loc_x
+- loc_y
+- loc_map
 - created_at
 
-### robot_feedback
+### aia_robot_feedback
 - agent_id
 - tick
 - action
 - reward
 - outcome
-- map_id
 - context_json
 - created_at
 
-### robot_task
-- task_id
-- agent_id
-- mode
-- status
-- priority
-- conditions_json
-- parameters_json
-- updated_at
-
-### robot_decision
+### aia_robot_decision
 - agent_id
 - tick
 - action
@@ -66,10 +52,10 @@
 - created_at
 
 ## 운영 흐름
-1. 서버가 robot_state / robot_event / robot_feedback 기록
+1. 서버가 `aia_robot_state` / `aia_robot_event` / `aia_robot_feedback` 기록
 2. AIA가 이를 읽어 판단
-3. AIA가 robot_decision / robot_trace_summary 갱신
-4. 서버는 robot_decision을 읽거나 API로 받음
+3. AIA가 `aia_robot_decision` / `aia_robot_trace_summary` 갱신
+4. 서버는 `aia_robot_decision`을 읽거나 API로 받음
 5. 서버는 최종 검증 후 실행
 
 ## 장점

@@ -210,9 +210,14 @@ class RobotLearningDigestService:
                 "밀집",
                 "과밀",
                 "유저 양보",
+                "우회",
+                "경로",
                 "crowd",
                 "crowded",
                 "density",
+                "relief",
+                "reroute",
+                "blocked_path",
             )
         )
 

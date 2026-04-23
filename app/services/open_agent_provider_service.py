@@ -69,7 +69,7 @@ class OpenAgentProviderService:
             self._provider(
                 key="autogen",
                 name="AutoGen",
-                role="legacy_multi_agent_reference",
+                role="maintenance_multi_agent_reference",
                 license_note="maintenance-mode; avoid new hard dependency",
                 integration_mode="reference_or_migration_only",
                 strengths=["agentchat_patterns", "multi_agent_research", "migration_lessons"],

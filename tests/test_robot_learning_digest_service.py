@@ -153,3 +153,26 @@ def test_learning_digest_detects_runtime_and_talk_memory_issues() -> None:
     assert "low_confidence_decision" in issue_types
     assert "empty_talk_memory" in issue_types
     assert response.delete_talk_keys == []
+
+
+def test_learning_digest_treats_single_collision_relief_as_benign() -> None:
+    request = RobotLearningDigestRequest(
+        server_name="test",
+        tick=5,
+        records=[
+            RobotActionRecord(
+                uid=401,
+                agent_id="robot_collision",
+                robot_uid=401,
+                action_type="collision_relief",
+                detail="이동 경로 막힘 우회",
+                loc_x=32429,
+                loc_y=32979,
+                loc_map=0,
+            )
+        ],
+    )
+    response = robot_learning_digest_service.apply_digest(request)
+    issue_types = {issue["issue_type"] for issue in response.issues}
+    assert response.issue_count == 0
+    assert "movement_stall" not in issue_types

@@ -13,6 +13,7 @@ from app.services.rebalance_service import rebalance_service
 from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.shard_balancer_service import shard_balancer_service
+from app.services.server_context_service import server_context_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
 
@@ -55,6 +56,11 @@ def validate_world_profile(world_id: str) -> dict:
     profile = world_profile_service.load(world_id)
     validation = world_profile_validator.validate(profile)
     return {"world_id": world_id, "validation": validation, "profile": profile}
+
+
+@router.get("/server-context")
+def server_context() -> dict:
+    return server_context_service.snapshot()
 
 
 @router.get("/robot-ai", response_model=RobotAiOpsDashboardResponse)

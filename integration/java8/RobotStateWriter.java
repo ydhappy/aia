@@ -5,7 +5,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 
 /**
- * robot_state 테이블에 현재 상태를 기록하는 클래스입니다.
+ * aia_robot_state 테이블에 현재 상태를 기록하는 클래스입니다.
  *
  * 초보자용 설명:
  * - 이 클래스는 DB 연결만 맞으면 바로 쓸 수 있습니다.
@@ -26,22 +26,38 @@ public class RobotStateWriter {
 
     public void write(RobotStateExtractor.RobotSnapshot s) throws Exception {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
-            String sql = "REPLACE INTO robot_state (agent_id, tick, hp, mp, x, y, map_id, target_id, target_distance, safe_zone, weight_percent, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO aia_robot_state "
+                    + "(robot_uid, name, hp, mp, hp_percent, ai_status, mode, mode_label, last_active) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW()) "
+                    + "ON DUPLICATE KEY UPDATE "
+                    + "name=VALUES(name), hp=VALUES(hp), mp=VALUES(mp), hp_percent=VALUES(hp_percent), "
+                    + "ai_status=VALUES(ai_status), mode=VALUES(mode), mode_label=VALUES(mode_label), last_active=NOW()";
             PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setString(1, s.agentId);
-            ps.setLong(2, s.tick);
+            ps.setInt(1, s.robotUid > 0 ? s.robotUid : stableRobotUid(s.agentId));
+            ps.setString(2, safeName(s.agentId));
             ps.setInt(3, s.hp);
             ps.setInt(4, s.mp);
-            ps.setInt(5, s.x);
-            ps.setInt(6, s.y);
-            ps.setInt(7, s.mapId);
-            ps.setString(8, s.targetId);
-            ps.setInt(9, s.targetDistance);
-            ps.setBoolean(10, s.safeZone);
-            ps.setInt(11, s.weightPercent);
-            ps.setString(12, "{}");
+            ps.setInt(5, Math.max(0, Math.min(100, s.hp)));
+            ps.setInt(6, 0);
+            ps.setInt(7, -1);
+            ps.setString(8, "AIA");
             ps.executeUpdate();
             ps.close();
         }
+    }
+
+    private int stableRobotUid(String agentId) {
+        if (agentId == null || agentId.length() == 0) {
+            return 1;
+        }
+        int hash = agentId.hashCode() & 0x7fffffff;
+        return Math.max(1, hash % 2000000000);
+    }
+
+    private String safeName(String agentId) {
+        if (agentId == null || agentId.length() == 0) {
+            return "aia_robot";
+        }
+        return agentId.length() > 45 ? agentId.substring(0, 45) : agentId;
     }
 }

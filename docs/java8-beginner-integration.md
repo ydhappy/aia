@@ -44,13 +44,13 @@ AIA가 반환한 action을 실제 이동/공격/스킬/귀환 함수로 연결�
 처음에는 println으로 테스트하고, 나중에 실제 서버 함수로 바꿉니다.
 
 ### RobotStateWriter
-현재 상태를 `robot_state` 테이블에 기록합니다.
+현재 상태를 `aia_robot_state` 테이블에 기록합니다.
 
 ### RobotEventWriter
-중요 이벤트를 `robot_event` 테이블에 기록합니다.
+중요 이벤트를 `aia_robot_event` 테이블에 기록합니다.
 
 ### RobotFeedbackWriter
-행동 결과를 `robot_feedback` 테이블에 기록합니다.
+행동 결과를 `aia_robot_feedback` 테이블에 기록합니다.
 학습/성장에 필요합니다.
 
 ### DbDecisionPoller

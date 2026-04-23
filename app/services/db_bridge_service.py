@@ -17,56 +17,56 @@ except Exception:  # pragma: no cover
 
 
 SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS robot_state (
-    agent_id TEXT PRIMARY KEY,
-    tick INTEGER,
-    hp INTEGER,
-    mp INTEGER,
-    x INTEGER,
-    y INTEGER,
-    map_id INTEGER,
-    target_id TEXT,
-    target_distance INTEGER,
-    safe_zone INTEGER,
-    weight_percent INTEGER,
-    payload_json TEXT,
+CREATE TABLE IF NOT EXISTS aia_robot_state (
+    robot_uid INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    hp INTEGER NOT NULL DEFAULT 0,
+    mp INTEGER NOT NULL DEFAULT 0,
+    hp_percent INTEGER NOT NULL DEFAULT 0,
+    ai_status INTEGER NOT NULL DEFAULT 0,
+    mode INTEGER NOT NULL DEFAULT -1,
+    mode_label TEXT NOT NULL DEFAULT '',
+    stall_count INTEGER NOT NULL DEFAULT 0,
+    nav_fail INTEGER NOT NULL DEFAULT 0,
+    last_active TIMESTAMP NULL DEFAULT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS robot_event (
-    id INTEGER PRIMARY KEY,
-    agent_id TEXT,
-    tick INTEGER,
-    event_type TEXT,
-    severity TEXT,
-    message TEXT,
-    payload_json TEXT,
+CREATE TABLE IF NOT EXISTS aia_robot_event (
+    uid INTEGER PRIMARY KEY AUTOINCREMENT,
+    object_id INTEGER NOT NULL DEFAULT 0,
+    name TEXT NOT NULL DEFAULT '',
+    action_type TEXT NOT NULL DEFAULT '',
+    detail TEXT NOT NULL DEFAULT '',
+    loc_x INTEGER NOT NULL DEFAULT 0,
+    loc_y INTEGER NOT NULL DEFAULT 0,
+    loc_map INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS robot_feedback (
-    id INTEGER PRIMARY KEY,
-    agent_id TEXT,
+CREATE TABLE IF NOT EXISTS aia_robot_feedback (
+    uid INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL DEFAULT '',
     tick INTEGER,
-    action TEXT,
+    action TEXT NOT NULL DEFAULT '',
     reward REAL,
     outcome TEXT,
-    map_id INTEGER,
+    map_id INTEGER NOT NULL DEFAULT 0,
     context_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS robot_decision (
-    id INTEGER PRIMARY KEY,
-    agent_id TEXT,
+CREATE TABLE IF NOT EXISTS aia_robot_decision (
+    uid INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL DEFAULT '',
     tick INTEGER,
-    action TEXT,
+    action TEXT NOT NULL DEFAULT '',
     action_args_json TEXT,
     confidence REAL,
     source TEXT,
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS robot_trace_summary (
-    id INTEGER PRIMARY KEY,
-    agent_id TEXT,
+CREATE TABLE IF NOT EXISTS aia_robot_trace_summary (
+    uid INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL DEFAULT '',
     tick INTEGER,
     trace_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -150,18 +150,18 @@ class DBBridgeService:
         limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute(f"SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT {limit}").fetchall()
+                rows = conn.execute(f"SELECT * FROM aia_robot_state ORDER BY updated_at DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_state ORDER BY updated_at DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
@@ -169,18 +169,18 @@ class DBBridgeService:
         limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute(f"SELECT * FROM robot_event ORDER BY id DESC LIMIT {limit}").fetchall()
+                rows = conn.execute(f"SELECT * FROM aia_robot_event ORDER BY uid DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_event ORDER BY uid DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_event ORDER BY id DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_event ORDER BY uid DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
@@ -188,18 +188,18 @@ class DBBridgeService:
         limit = self.poll_limit
         if self.backend == "sqlite":
             with self._connect() as conn:
-                rows = conn.execute(f"SELECT * FROM robot_feedback ORDER BY id DESC LIMIT {limit}").fetchall()
+                rows = conn.execute(f"SELECT * FROM aia_robot_feedback ORDER BY uid DESC LIMIT {limit}").fetchall()
                 return [dict(row) for row in rows]
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_feedback ORDER BY uid DESC LIMIT %s", (limit,))
                     cols = [d.name for d in cur.description]
                     return [dict(zip(cols, row)) for row in cur.fetchall()]
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM robot_feedback ORDER BY id DESC LIMIT %s", (limit,))
+                    cur.execute("SELECT * FROM aia_robot_feedback ORDER BY uid DESC LIMIT %s", (limit,))
                     return list(cur.fetchall())
         return []
 
@@ -233,18 +233,18 @@ class DBBridgeService:
         values = self._decision_values(rows)
         if self.backend == "sqlite":
             with self._connect() as conn:
-                conn.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (?, ?, ?, ?, ?, ?, ?)", values)
+                conn.executemany("INSERT INTO aia_robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (?, ?, ?, ?, ?, ?, ?)", values)
             return {"written": True, "count": len(values)}
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
+                    cur.executemany("INSERT INTO aia_robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
                 conn.commit()
             return {"written": True, "count": len(values)}
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.executemany("INSERT INTO robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
+                    cur.executemany("INSERT INTO aia_robot_decision (agent_id, tick, action, action_args_json, confidence, source, reason) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
             return {"written": True, "count": len(values)}
         return {"written": False, "reason": "unsupported_backend", "count": 0}
 
@@ -252,18 +252,18 @@ class DBBridgeService:
         values = self._trace_values(rows)
         if self.backend == "sqlite":
             with self._connect() as conn:
-                conn.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (?, ?, ?)", values)
+                conn.executemany("INSERT INTO aia_robot_trace_summary (agent_id, tick, trace_json) VALUES (?, ?, ?)", values)
             return {"written": True, "count": len(values)}
         if self.backend == "postgresql" and psycopg is not None:
             with self._pg_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
+                    cur.executemany("INSERT INTO aia_robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
                 conn.commit()
             return {"written": True, "count": len(values)}
         if self.backend == "mysql" and pymysql is not None:
             with self._mysql_connect() as conn:
                 with conn.cursor() as cur:
-                    cur.executemany("INSERT INTO robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
+                    cur.executemany("INSERT INTO aia_robot_trace_summary (agent_id, tick, trace_json) VALUES (%s, %s, %s)", values)
             return {"written": True, "count": len(values)}
         return {"written": False, "reason": "unsupported_backend", "count": 0}
 

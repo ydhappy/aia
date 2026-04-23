@@ -15,7 +15,7 @@ AIA는 아래 역할을 소유합니다.
 - 정책 판단, 위험도 판정, 네비게이션 전략, 분산 사냥, 텔포사냥 힌트.
 - 토크, 학습, 성장, 이슈 체크리스트, 운영 대시보드.
 - 다른 서버에서도 사용할 수 있는 `/api/v1/robot/ops-tick` 단일 운영 API.
-- `_robot_book`, `_robot_talk` 같은 DB 기준이 비어 있어도 AIA 기본 기준으로 사냥터/토크를 생성.
+- 서버 로봇북/토크 DB가 비어 있어도 AIA 기본 기준으로 사냥터/토크를 생성.
 
 ## Ops Tick API
 
@@ -54,7 +54,7 @@ AIA는 아래 역할을 소유합니다.
 - 저장: `POST /dashboard/robot-autonomy-baseline`
 - 리로드: `POST /dashboard/robot-autonomy-baseline/reload`
 
-학습 digest가 성공하면 응답은 `delete_uids`와 `delete_talk_keys`를 내려줍니다. 서버는 학습 반영이 끝난 `_robot_action_log`와 `_robot_talk_memory` 실시간 기록을 삭제하고, `_robot_aia_issue_log`는 해결 확인 전까지 보존합니다.
+학습 digest가 성공하면 응답은 `delete_uids`와 `delete_talk_keys`를 내려줍니다. 서버는 학습 반영이 끝난 `aia_robot_event` 실시간 기록을 삭제하고, `aia_robot_issue`는 해결 확인 전까지 보존합니다.
 
 ## Dashboard
 

@@ -112,7 +112,7 @@ def robot_ops_tick(request: AiaRobotOpsTickRequest) -> AiaRobotOpsTickResponse:
     server_contract = (
         dashboard.server_minimal_contract
         if dashboard is not None
-        else robot_ai_ops_service.dashboard_snapshot([]).server_minimal_contract
+        else robot_ai_ops_service.server_minimal_contract()
     )
 
     return AiaRobotOpsTickResponse(

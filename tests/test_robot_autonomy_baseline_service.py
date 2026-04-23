@@ -2,7 +2,7 @@ from app.models.request_models import AgentState
 from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 
 
-def test_baseline_builds_profile_without_robot_book_or_talk_table() -> None:
+def test_baseline_builds_profile_from_aia_baseline_only() -> None:
     state = AgentState(
         hp=91,
         mp=40,
@@ -16,7 +16,7 @@ def test_baseline_builds_profile_without_robot_book_or_talk_table() -> None:
     talk = robot_autonomy_baseline_service.build_talk_suggestion("robot_501", state, profile, {}, {})
 
     assert profile["role"] == "tank"
-    assert profile["metadata"]["no_robot_book_required"] is True
+    assert profile["metadata"]["aia_autonomy_without_book_table"] is True
     assert profile["metadata"]["no_talk_table_required"] is True
     assert profile["patrol_points"]
     assert talk["message"]
@@ -74,3 +74,35 @@ def test_baseline_prefers_learned_safe_zone_when_confident() -> None:
     assert zone["id"] == "aia_learned_preferred"
     assert zone["x"] == 33111
     assert zone["radius"] == 33
+
+
+def test_baseline_loads_aia_top_profile() -> None:
+    profile = robot_autonomy_baseline_service.load_top_profile(force=True)
+    view = robot_autonomy_baseline_service.operator_view()
+
+    assert profile["description"].startswith("AIA")
+    assert view["summary"]["aia_top_zones"] >= 90
+    assert view["summary"]["aia_party_spawn_groups"] == 10
+    assert view["summary"]["aia_pickup_zones"] == 2
+
+
+def test_baseline_can_select_aia_field_zone() -> None:
+    state = AgentState(
+        hp=90,
+        mp=40,
+        x=33449,
+        y=32817,
+        map_id=4,
+        can_teleport=True,
+        extras={"level": 32, "class_name": "knight", "robot_uid": 777},
+    )
+
+    zones = robot_autonomy_baseline_service._enabled_zones(robot_autonomy_baseline_service.load())
+    matching = [
+        zone for zone in zones
+        if zone.get("source") == "aia_top"
+        and zone.get("map_id") == state.map_id
+        and zone.get("min_level", 0) <= 32 <= zone.get("max_level", 999)
+    ]
+
+    assert matching

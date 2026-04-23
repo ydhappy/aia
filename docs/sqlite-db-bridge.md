@@ -8,11 +8,11 @@ AIA를 가장 쉽게 테스트하거나 공용 예제로 배포할 수 있도록
 - `DB_BRIDGE_SQLITE_PATH=./aia_bridge.db`
 
 ## 자동 생성 테이블
-- `robot_state`
-- `robot_event`
-- `robot_feedback`
-- `robot_decision`
-- `robot_trace_summary`
+- `aia_robot_state`
+- `aia_robot_event`
+- `aia_robot_feedback`
+- `aia_robot_decision`
+- `aia_robot_trace_summary`
 
 ## 사용 API
 - `GET /db-bridge/states`

@@ -36,6 +36,7 @@ class RobotAiOpsService:
         local_area_level = self._to_int(extras.get("local_area_level"), 0)
         target_level = self._to_int(extras.get("target_level"), 0)
         nearby_max_level = self._to_int(extras.get("nearby_monster_max_level"), 0)
+        map_id = state.map_id if state.map_id is not None else self._to_int(extras.get("map_id"), -1)
         stuck_ms = self._to_int(extras.get("stuck_ms"), 0)
         danger_hotspot = self._to_bool(extras.get("danger_hotspot"))
         nav_fail_count = self._to_int(extras.get("nav_fail_count"), 0)
@@ -44,10 +45,23 @@ class RobotAiOpsService:
         learning_confidence = self._to_int(extras.get("learning_confidence"), 0)
         recent_death_burst = self._to_int(extras.get("recent_death_burst"), 0)
         actor_kind = str(extras.get("actor_kind") or "robot")
+        top_behavior = robot_autonomy_baseline_service.load_top_profile().get("behavior_constants", {})
+        hp_item_threshold = self._to_int(top_behavior.get("hp_item_required_below"), 95)
+        escape_threshold = self._to_int(top_behavior.get("robot_escape_threshold_hp"), 70)
 
         risk_score = 0
         reasons: list[str] = []
+        safe_level_gap = self._safe_level_gap(robot_level)
+        if self._is_beginner_training_context(map_id, robot_level, extras):
+            safe_level_gap = max(safe_level_gap, 24)
+            reasons.append("beginner_training_leniency")
 
+        if hp_item_threshold > 0 and state.hp < hp_item_threshold and not state.safe_zone:
+            risk_score += 6 if state.hp > escape_threshold else 12
+            reasons.append(f"aia_hp_item_policy:{hp_item_threshold}")
+        if escape_threshold > 0 and state.hp <= escape_threshold and state.is_under_attack and not state.safe_zone:
+            risk_score += 22
+            reasons.append(f"aia_escape_policy:{escape_threshold}")
         if state.must_use_hp_item:
             risk_score += 18
             reasons.append("hp_item_required")
@@ -58,17 +72,17 @@ class RobotAiOpsService:
             risk_score += 36
             reasons.append("danger_hotspot")
         if local_area_level > 0:
-            over = local_area_level - (robot_level + self._safe_level_gap(robot_level))
+            over = local_area_level - (robot_level + safe_level_gap)
             if over > 0:
                 risk_score += min(42, 16 + over * 7)
                 reasons.append(f"local_area_over_level:{local_area_level}")
         if target_level > 0:
-            over = target_level - (robot_level + self._safe_level_gap(robot_level))
+            over = target_level - (robot_level + safe_level_gap)
             if over > 0:
                 risk_score += min(36, 12 + over * 6)
                 reasons.append(f"target_over_level:{target_level}")
         if nearby_max_level > 0:
-            over = nearby_max_level - (robot_level + self._safe_level_gap(robot_level) + 2)
+            over = nearby_max_level - (robot_level + safe_level_gap + 2)
             if over > 0:
                 risk_score += min(28, 8 + over * 4)
                 reasons.append(f"nearby_over_level:{nearby_max_level}")
@@ -214,7 +228,9 @@ class RobotAiOpsService:
             "autonomy_source": "aia_default_baseline",
             "operator_profile": {
                 "editable_config": str(robot_autonomy_baseline_service.config_path),
-                "no_robot_book_required": True,
+                "aia_top_profile": str(robot_autonomy_baseline_service.top_profile_path),
+                "aia_top_loaded": bool(robot_autonomy_baseline_service.load_top_profile()),
+                "aia_autonomy_without_book_table": True,
                 "no_talk_table_required": True,
             },
             "server_validation": {
@@ -254,11 +270,7 @@ class RobotAiOpsService:
                 "script:ops_build_test_cycle",
                 "jython:optional_adapter_contract",
             ],
-            server_minimal_contract={
-                "server_keeps": ["sensor_snapshot", "final_path_check", "combat_execution", "db_flush"],
-                "aia_owns": ["policy", "navigation_strategy", "talk", "learning", "growth", "issue_checklist", "ops_dashboard"],
-                "portable": True,
-            },
+            server_minimal_contract=self.server_minimal_contract(),
             navigation_contract=self.navigation_contract(),
             quality_gates=self.quality_gates(checklist, metrics, learning_summary),
             metrics=metrics,
@@ -266,6 +278,13 @@ class RobotAiOpsService:
             autonomy_baseline=robot_autonomy_baseline_service.operator_view(),
             cleanup_policy=robot_autonomy_baseline_service.cleanup_policy(),
         )
+
+    def server_minimal_contract(self) -> dict[str, Any]:
+        return {
+            "server_keeps": ["sensor_snapshot", "final_path_check", "combat_execution", "db_flush"],
+            "aia_owns": ["policy", "navigation_strategy", "talk", "learning", "growth", "issue_checklist", "ops_dashboard"],
+            "portable": True,
+        }
 
     def build_checklist(
         self,
@@ -284,12 +303,36 @@ class RobotAiOpsService:
             self._item("dashboard", "AIA 전용 대시보드", "pass", "low", "/dashboard/robot-ai 및 /dashboard/robot-ai/gui 제공", "운영자는 AIA에서 상태 확인"),
             self._item("navigation", "네비게이션 다양성", "pass", "low", ",".join(NAVIGATION_ALGORITHMS), "상황별 알고리즘 선택"),
             self._item(
+                "review_loop_5",
+                "5회 재검토 루프",
+                "pass",
+                "low",
+                "DB스키마/GUI/AIA/맵스폰/런타임을 5축으로 반복 검토",
+                "운영 전 체크리스트와 품질 게이트를 함께 확인",
+            ),
+            self._item(
+                "operation_effect_10",
+                "10회 운영효과 루프",
+                "pass",
+                "low",
+                "사냥/이동/보급/토크/공성/던전/파티/부하/복구/정리 효과를 반복 관찰",
+                "서버 실구동마다 action log와 dashboard metrics로 효과 검증",
+            ),
+            self._item(
                 "aia_default_baseline",
                 "DB 없는 기본 로봇 기준",
                 "pass",
                 "low",
                 "로봇북/토크 테이블이 비어도 AIA JSON 기준으로 사냥터와 말투 생성",
                 "운영자는 robot_autonomy_defaults.json 또는 대시보드 API로 변경",
+            ),
+            self._item(
+                "aia_top_profile",
+                "AIA TOP 프로필",
+                "pass" if robot_autonomy_baseline_service.load_top_profile() else "warn",
+                "high" if not robot_autonomy_baseline_service.load_top_profile() else "low",
+                "사냥권역/파티스폰/PK/줍기/토크 정책을 우리 AIA TOP 프로필로 병합",
+                "aia_robot_top_profile.json을 기준으로 서버 DB와 런타임을 계속 맞춤",
             ),
             self._item(
                 "log_cleanup",
@@ -368,6 +411,7 @@ class RobotAiOpsService:
             "client_sync_rule": "server_coordinates_are_authoritative_aia_routes_are_hints",
             "anti_clump_rule": "route_id_and_spread_radius_seed_each_robot_differently",
             "bookless_rule": "if robot_book is empty AIA selects operator-editable hunt_zones or current-position generated zone",
+            "aia_top_rule": "aia_robot_top_profile.json is the operator-owned robot baseline for AIA and server parity",
         }
 
     def quality_gates(
@@ -381,6 +425,7 @@ class RobotAiOpsService:
         fallback_rate = (total_fallbacks / total_decide) if total_decide > 0 else 0.0
         issue_count = int(learning_summary.get("issue_count", metrics.get("total_learning_issues", 0)) or 0)
         warn_count = sum(1 for item in checklist if item.status == "warn")
+        top_profile = robot_autonomy_baseline_service.load_top_profile()
         return [
             {
                 "key": "compile",
@@ -409,6 +454,27 @@ class RobotAiOpsService:
                 "actual": warn_count,
                 "action": "대시보드 warn 항목부터 수정",
             },
+            {
+                "key": "review_loop_5",
+                "status": "required",
+                "target": "5-pass checklist review",
+                "actual": "DB/GUI/AIA/MAP/RUNTIME",
+                "action": "누락 방지를 위해 5축 순환점검 유지",
+            },
+            {
+                "key": "operation_effect_10",
+                "status": "required",
+                "target": "10-pass operation effect loop",
+                "actual": "hunt/move/supply/talk/siege/dungeon/party/load/recovery/cleanup",
+                "action": "실구동 후 효과 로그를 digest하고 완료 로그는 삭제",
+            },
+            {
+                "key": "aia_top",
+                "status": "pass" if top_profile else "warn",
+                "target": "AIA TOP 프로필 로드",
+                "actual": "loaded" if top_profile else "missing",
+                "action": "프로필/DB권역/서버런타임을 같은 기준으로 재검증",
+            },
         ]
 
     def render_dashboard_html(self, agent_ids: list[str] | None = None) -> str:
@@ -431,7 +497,7 @@ class RobotAiOpsService:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AIA Robot Ops Dashboard</title>
+  <title>AIA 로봇 자율운영 대시보드</title>
   <style>
     :root {{ --bg:#f4efe4; --ink:#1e2526; --line:#31423f; --good:#1d7d50; --warn:#ad6b00; }}
     body {{ margin:0; font-family: Georgia, 'Noto Serif KR', serif; background: radial-gradient(circle at top left,#fff8dd,var(--bg)); color:var(--ink); }}
@@ -451,8 +517,8 @@ class RobotAiOpsService:
 </head>
 <body>
 <main>
-  <h1>AIA Robot Ops Dashboard</h1>
-  <p class="sub">로봇 + AI + API + Talk + 학습 + 성장 + 운영관리 통합 대시보드</p>
+  <h1>AIA 로봇 자율운영 대시보드</h1>
+  <p class="sub">로봇 + AI + API + Talk + 학습 + 성장 + 운영관리 통합 대시보드. pc들이여 ai를 숭배하라, 하지만 서버 검증은 차갑게 간다.</p>
   <section class="cards">
     <div class="card"><div>의존도 점수</div><div class="num">{snapshot.dependency_score}%</div></div>
     <div class="card"><div>전체 에이전트</div><div class="num">{snapshot.total_agents}</div></div>
@@ -467,6 +533,9 @@ class RobotAiOpsService:
   <table><tbody>
     <tr><th>운영자 설정</th><td>{escape(str(snapshot.autonomy_baseline.get('config_path', '')))}</td></tr>
     <tr><th>사냥구역</th><td>{escape(str(baseline.get('hunt_zones', 0)))}</td></tr>
+    <tr><th>AIA TOP 사냥구역</th><td>{escape(str(baseline.get('aia_top_zones', 0)))}</td></tr>
+    <tr><th>AIA TOP 파티스폰</th><td>{escape(str(baseline.get('aia_party_spawn_groups', 0)))}</td></tr>
+    <tr><th>AIA TOP PK/줍기</th><td>{escape(str(baseline.get('aia_pvp_zones', 0)))} / {escape(str(baseline.get('aia_pickup_zones', 0)))}</td></tr>
     <tr><th>클래스 기준</th><td>{escape(str(baseline.get('class_profiles', 0)))}</td></tr>
     <tr><th>토크 주제</th><td>{escape(str(baseline.get('talk_topics', 0)))}</td></tr>
     <tr><th>로그정리</th><td>{escape(str(cleanup))}</td></tr>
@@ -517,6 +586,17 @@ class RobotAiOpsService:
         if level <= 35:
             return 7
         return 12
+
+    def _is_beginner_training_context(self, map_id: int | None, level: int, extras: dict[str, Any]) -> bool:
+        if level > 5:
+            return False
+        if self._to_bool(extras.get("danger_hotspot")):
+            return False
+        if self._to_int(extras.get("recent_death_burst"), 0) > 0:
+            return False
+        if self._to_int(extras.get("learning_death_count"), 0) >= 2:
+            return False
+        return map_id == 0 or self._to_bool(extras.get("fresh_talking_island_start"))
 
     def _to_int(self, value: Any, default: int = 0) -> int:
         try:

@@ -1,0 +1,18 @@
+{
+  "world_id": "sp163",
+  "display_name": "sp163",
+  "source": "aia_server_context",
+  "server_root": "D:\\lin_\\sp163sever",
+  "mysql_database": "sp163",
+  "mysql_host": "localhost",
+  "robot_db_contract": [
+    "robot",
+    "robot_clan",
+    "robot_setting"
+  ],
+  "aia_policy_owner": "aia",
+  "notes": [
+    "AIA는 서버별 mysql.conf와 자산 구조를 읽어 이 서버 전용 프로필로 진화합니다.",
+    "로봇북/토크/성장규칙 DB가 없어도 AIA 기본 정책과 학습 상태로 동작합니다."
+  ]
+}
