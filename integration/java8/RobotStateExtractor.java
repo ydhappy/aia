@@ -18,6 +18,8 @@ public class RobotStateExtractor {
         public String agentId;
         public long tick;
         public int hp;
+        public int maxHp;
+        public int hpPercent;
         public int mp;
         public int x;
         public int y;
@@ -90,6 +92,8 @@ public class RobotStateExtractor {
 
         // TODO 3: 아래 값들을 실제 서버 객체 getter로 바꾸세요.
         s.hp = 100;
+        s.maxHp = 100;
+        s.hpPercent = 100;
         s.mp = 50;
         s.x = 0;
         s.y = 0;

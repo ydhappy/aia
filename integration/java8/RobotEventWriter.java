@@ -31,19 +31,31 @@ public class RobotEventWriter {
     }
 
     public void write(String agentId, long tick, String eventType, String severity, String message, String payloadJson) throws Exception {
+        write(agentId, tick, stableObjectId(agentId), eventType, severity, message, payloadJson, 0, 0, 0);
+    }
+
+    public void write(String agentId, long tick, long objectId, String eventType, String severity, String message,
+            String payloadJson, int x, int y, int mapId) throws Exception {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
             String sql = "INSERT INTO aia_robot_event (object_id, name, action_type, detail, loc_x, loc_y, loc_map) VALUES (?, ?, ?, ?, ?, ?, ?)";
             PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setLong(1, tick);
+            ps.setLong(1, objectId > 0 ? objectId : stableObjectId(agentId));
             ps.setString(2, safeName(agentId));
             ps.setString(3, eventType);
             ps.setString(4, safeDetail(severity, message, payloadJson));
-            ps.setInt(5, 0);
-            ps.setInt(6, 0);
-            ps.setInt(7, 0);
+            ps.setInt(5, x);
+            ps.setInt(6, y);
+            ps.setInt(7, mapId);
             ps.executeUpdate();
             ps.close();
         }
+    }
+
+    private long stableObjectId(String agentId) {
+        if (agentId == null || agentId.length() == 0) {
+            return 1L;
+        }
+        return (long) (agentId.hashCode() & 0x7fffffff);
     }
 
     private String safeName(String agentId) {

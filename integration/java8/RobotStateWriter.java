@@ -37,7 +37,7 @@ public class RobotStateWriter {
             ps.setString(2, safeName(s.agentId));
             ps.setInt(3, s.hp);
             ps.setInt(4, s.mp);
-            ps.setInt(5, Math.max(0, Math.min(100, s.hp)));
+            ps.setInt(5, resolveHpPercent(s));
             ps.setInt(6, 0);
             ps.setInt(7, -1);
             ps.setString(8, "AIA");
@@ -59,5 +59,15 @@ public class RobotStateWriter {
             return "aia_robot";
         }
         return agentId.length() > 45 ? agentId.substring(0, 45) : agentId;
+    }
+
+    private int resolveHpPercent(RobotStateExtractor.RobotSnapshot s) {
+        if (s.hpPercent > 0) {
+            return Math.max(0, Math.min(100, s.hpPercent));
+        }
+        if (s.maxHp > 0) {
+            return Math.max(0, Math.min(100, (s.hp * 100) / s.maxHp));
+        }
+        return Math.max(0, Math.min(100, s.hp));
     }
 }
