@@ -59,13 +59,14 @@ if (Test-Path $Java8) {
     if (Test-Path examples\java8) {
         $javaFiles += Get-ChildItem -Path examples\java8 -Filter *.java | ForEach-Object { $_.FullName }
     }
-    & $Java8 -encoding UTF-8 @javaFiles
+    $javaOut = Join-Path $root "build\java8-classes"
+    if (Test-Path $javaOut) {
+        Remove-Item -Recurse -Force $javaOut
+    }
+    New-Item -ItemType Directory -Force -Path $javaOut | Out-Null
+    & $Java8 -encoding UTF-8 -d $javaOut @javaFiles
     if ($LASTEXITCODE -ne 0) {
         throw "Java 8 compile failed: $LASTEXITCODE"
-    }
-    Get-ChildItem -Path integration\java8 -Filter *.class | Remove-Item -Force
-    if (Test-Path examples\java8) {
-        Get-ChildItem -Path examples\java8 -Filter *.class | Remove-Item -Force
     }
     Write-Output "JAVA8_COMPILE=0"
 } else {
