@@ -56,9 +56,6 @@ Write-Output "PIP_CHECK_EXIT=0"
 if (Test-Path $Java8) {
     $javaFiles = @()
     $javaFiles += Get-ChildItem -Path integration\java8 -Filter *.java | ForEach-Object { $_.FullName }
-    if (Test-Path examples\java8) {
-        $javaFiles += Get-ChildItem -Path examples\java8 -Filter *.java | ForEach-Object { $_.FullName }
-    }
     $javaOut = Join-Path $root "build\java8-classes"
     if (Test-Path $javaOut) {
         Remove-Item -Recurse -Force $javaOut
