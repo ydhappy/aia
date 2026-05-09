@@ -2,6 +2,7 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -29,8 +30,13 @@ def request_json(method: str, path: str, payload: dict | None = None, expected_s
     return data
 
 
+def robot_path(agent_id: str) -> str:
+    return "/robot/%s" % urllib.parse.quote(agent_id, safe="")
+
+
 def main() -> None:
     agent_id = "robot_crud_smoke_%s" % int(time.time())
+    path = robot_path(agent_id)
     profile = {
         "agent_id": agent_id,
         "name": "스모크로봇",
@@ -46,12 +52,12 @@ def main() -> None:
 
     patched = request_json(
         "PATCH",
-        "/robot/%s/profile" % urllib.parse.quote(agent_id, safe=""),
+        path + "/profile",
         {"style": "defensive", "metadata": {"source": "robot_crud_smoke", "memo": "수정 완료"}},
     )
-    loaded = request_json("GET", "/robot/%s" % urllib.parse.quote(agent_id, safe=""))
-    deleted = request_json("DELETE", "/robot/%s" % urllib.parse.quote(agent_id, safe=""))
-    missing = request_json("GET", "/robot/%s" % urllib.parse.quote(agent_id, safe=""), expected_status=404)
+    loaded = request_json("GET", path)
+    deleted = request_json("DELETE", path)
+    missing = request_json("GET", path, expected_status=404)
 
     print("ROBOT_CRUD_SMOKE_OK=1")
     print("CREATE=%s" % created.get("accepted"))
