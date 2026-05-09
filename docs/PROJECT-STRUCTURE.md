@@ -11,6 +11,8 @@ integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
 tests/               pytest 테스트
 ```
 
+`integration/java8/`의 package는 `integration.java8`입니다. 이 폴더의 파일은 실제 게임서버에 복사해 붙이는 것을 기준으로 합니다.
+
 ## 실행 코드
 
 ```text
@@ -26,6 +28,8 @@ runners/quality/     품질 게이트 실행
 ```text
 examples/java8/      Java 8 main 예제
 ```
+
+`examples/java8/`의 package는 `examples.java8`입니다. 예제는 `integration.java8.*`를 import해서 사용하는 샘플이며, 실제 서버에 복사할 필수 코드는 아닙니다.
 
 ## 실행 예시
 
@@ -48,10 +52,22 @@ python runners/smoke/ops_tick_smoke.py
 python runners/smoke/robot_crud_smoke.py
 ```
 
+Linux/GitHub Actions 품질 게이트:
+
+```bash
+python runners/quality/run_quality_gates.py
+```
+
 Windows 품질 게이트:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
+```
+
+Java 컴파일 출력:
+
+```text
+build/java8-classes/
 ```
 
 ## 원칙
@@ -60,3 +76,4 @@ powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 - `integration/java8/`에는 서버에 복사할 계약/클라이언트 코드만 둡니다.
 - `examples/java8/`에는 실행 가능한 Java main 예제만 둡니다.
 - `runners/`에는 사람이 직접 실행하는 파일만 둡니다.
+- Java 예제는 `examples.java8` package를 사용하고, 서버 연동 코드는 `integration.java8` package를 사용합니다.
