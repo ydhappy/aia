@@ -25,8 +25,27 @@ class InMemoryStateStore:
         self._profiles[agent_id] = profile
         self._metrics["total_profiles_saved"] += 1
 
+    def update_profile(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        current = dict(self._profiles.get(agent_id, {"agent_id": agent_id}))
+        current.update(patch)
+        current["agent_id"] = agent_id
+        self.save_profile(agent_id, current)
+        return current
+
     def get_profile(self, agent_id: str) -> dict[str, Any]:
         return self._profiles.get(agent_id, {})
+
+    def has_agent(self, agent_id: str) -> bool:
+        return agent_id in self.list_agent_ids() or agent_id in self._learning
+
+    def delete_agent(self, agent_id: str) -> bool:
+        existed = self.has_agent(agent_id)
+        self._states.pop(agent_id, None)
+        self._profiles.pop(agent_id, None)
+        self._events.pop(agent_id, None)
+        self._traces.pop(agent_id, None)
+        self._learning.pop(agent_id, None)
+        return existed
 
     def save_event(self, agent_id: str, event: dict[str, Any]) -> None:
         events = self._events.setdefault(agent_id, [])
