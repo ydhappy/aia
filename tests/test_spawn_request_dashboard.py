@@ -36,6 +36,9 @@ def test_spawn_request_retry_failed_falls_back_without_mysql() -> None:
     response = client.post("/dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=5")
     assert response.status_code == 200
     data = response.json()
+    assert data["action"] == "retry_failed"
+    assert data["server_name"] == "main"
+    assert data["limit"] == 5
     assert "accepted" in data
     assert "updated" in data
 
@@ -44,5 +47,9 @@ def test_spawn_request_recover_claimed_falls_back_without_mysql() -> None:
     response = client.post("/dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=5")
     assert response.status_code == 200
     data = response.json()
+    assert data["action"] == "recover_stale_claimed"
+    assert data["server_name"] == "main"
+    assert data["limit"] == 5
+    assert data["older_than_minutes"] == 10
     assert "accepted" in data
     assert "updated" in data
