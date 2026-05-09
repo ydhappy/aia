@@ -1,6 +1,6 @@
 # AIA 리팩토링 / 보강 체크리스트
 
-전체 코드, DB, Java 연동, 스크립트, 테스트를 한 번에 크게 바꾸지 않고 파트별로 점검합니다.
+전체 코드, DB, Java 연동, 스크립트, 테스트를 한 번에 크게 바꾸지 않고 파트별로 점검했습니다.
 
 ## 진행 원칙
 
@@ -11,8 +11,6 @@
 - 변경마다 테스트 또는 문서 근거를 남긴다.
 
 ## Part 1. 구조/설정/명백 오류 점검 - 완료
-
-체크 결과:
 
 - 라우트 등록 상태 확인.
 - `/robot/spawn-requests`가 `/robot/{agent_id}`보다 앞에 있어 경로 충돌 없음.
@@ -25,17 +23,8 @@
 - 빈 `classes` 차단.
 - 관련 테스트 보강.
 
-주요 커밋:
-
-- `chore: align env example with server integration defaults`
-- `fix: validate robot spawn request ranges`
-- `test: cover robot spawn request validation`
-
 ## Part 2. Robot CRUD / Spawn Request 안정화 - 완료
 
-체크 결과:
-
-- `/robot/{agent_id}`와 고정 경로 충돌 없음.
 - spawn request 생성 응답에 `submitted`, `affected`, `duplicate_policy`, `required_table` 추가.
 - MySQL 미사용 fallback 응답에 `required_table` 포함.
 - class 값 정규화 보강.
@@ -44,15 +33,7 @@
 - recovery 응답에 `action`, `server_name`, `limit`, `updated` 일관 적용.
 - 관련 테스트 보강.
 
-주요 커밋:
-
-- `refactor: clarify spawn request creation response`
-- `refactor: standardize spawn queue recovery responses`
-- `test: assert standardized spawn queue recovery response`
-
 ## Part 3. DB / SQL 정합성 - 완료
-
-체크 결과:
 
 - MySQL 5.5용 bridge 자동 생성 DDL을 명시형 `MYSQL_BRIDGE_SCHEMA_SQL`로 분리.
 - SQLite용 `TEXT NOT NULL DEFAULT ''` 변환 방식 제거.
@@ -62,15 +43,7 @@
 - spawn request SQL도 MySQL 5.5 호환 테스트 추가.
 - 품질 게이트에 `tests/test_mysql55_schema_compat.py` 추가.
 
-주요 커밋:
-
-- `fix: use explicit MySQL 5.5 bridge schema`
-- `test: guard MySQL 5.5 schema compatibility`
-- `test: add MySQL 5.5 schema compatibility gate`
-
 ## Part 4. Java 8 서버 연동부 - 완료
-
-체크 결과:
 
 - `LocalAiaClient`에 connect/read timeout 추가.
 - `LocalAiaClient.healthCheck()` 추가.
@@ -85,16 +58,7 @@
 - `AiaDecisionParser`의 escaped quote / nested object 처리 개선.
 - Java 8 컴파일 게이트는 기존 `integration/java8/*.java` 전체 대상 유지.
 
-주요 커밋:
-
-- `refactor: harden Java8 local AIA HTTP client`
-- `refactor: harden Java8 spawn poller JDBC handling`
-- `refactor: harden Java8 DB decision poller`
-- `refactor: improve Java8 decision parser escaping`
-
 ## Part 5. 스크립트 / 품질 게이트 - 완료
-
-체크 결과:
 
 - 원클릭 관련 잔여 검색 완료: 남은 참조 없음.
 - `scripts/run_local_aia.py` 기본 포트를 문서/.env 기준인 `8000`으로 통일.
@@ -104,22 +68,7 @@
 - `robot_crud_smoke.py`에 HTTP/비JSON/서버 미실행 오류 메시지 보강.
 - 품질 게이트는 Python compile, 주요 API 테스트, MySQL 5.5 SQL 테스트, 전체 pytest, pip check, Java 8 compile 순서 유지.
 
-주요 커밋:
-
-- `fix: align local AIA runner default port`
-- `fix: align bootstrap with server integration defaults`
-- `refactor: improve ops tick smoke errors`
-- `refactor: improve robot CRUD smoke errors`
-
 ## Part 6. GUI / Dashboard - 완료
-
-대상:
-
-- `app/api/routes_dashboard.py`
-- `app/services/spawn_request_dashboard_service.py`
-- `app/services/robot_ai_ops_service.py`
-
-체크 결과:
 
 - Spawn Queue JSON 응답에 `total`, `needs_attention`, `operator_hint` 추가.
 - DB backend가 MySQL이 아닐 때 운영자 조치 문구 표시.
@@ -132,17 +81,43 @@
 - HTML 출력은 기존 `escape()` 기반 유지.
 - GUI 테스트에 새 필드와 버튼 동작 문구 검증 추가.
 
-주요 커밋:
+## Part 7. 최종 정리 - 완료
 
-- `feat: improve spawn queue dashboard UX`
-- `fix: make spawn queue recovery buttons call query APIs`
-- `test: cover improved spawn queue dashboard UX`
+- 원클릭/Quickstart/18000포트/sqlite 강제 참조 검색 완료: 남은 참조 없음.
+- README를 최종 API/테스트/유지 문서 기준으로 정리.
+- `docs/USAGE.md`를 최종 Dashboard/테스트 기준으로 정리.
+- `docs/API.md`에 spawn request 응답 필드와 queue 복구 query parameter 반영.
+- 유지 문서 목록 확정.
 
-## Part 7. 최종 정리 - 다음 진행 대상
+## 유지 문서
 
-체크:
+```text
+README.md
+docs/USAGE.md
+docs/SERVER-INTEGRATION.md
+docs/API.md
+docs/REFACTOR-CHECKLIST.md
+```
 
-- README / USAGE / API 문서와 실제 코드 일치
-- 오래된 참조 검색
-- 테스트 명령 정리
-- 다음 개선 후보 목록화
+## 권장 테스트
+
+```bash
+pytest tests/test_robot_crud_api.py
+pytest tests/test_robot_spawn_request_api.py
+pytest tests/test_spawn_request_dashboard.py
+pytest tests/test_mysql55_schema_compat.py
+```
+
+Windows 전체 게이트:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
+```
+
+## 다음 개선 후보
+
+- 실제 L1J 계열 서버 클래스명 기준 `MyServerRobotAdapter` 샘플 추가.
+- Spawn Queue GUI에서 서버명 선택/최근 실패만 보기 추가.
+- ops-tick Java 예제에 실제 이동/공격 실행 전 검증 샘플 추가.
+- MySQL 연결 성공 여부를 `/health` 확장 항목으로 노출.
+- GitHub Actions 또는 별도 CI에서 Python/Java 품질 게이트 자동화.
