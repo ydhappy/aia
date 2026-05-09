@@ -26,6 +26,7 @@ def run_pytest() -> None:
         "tests/test_robot_crud_api.py",
         "tests/test_robot_spawn_request_api.py",
         "tests/test_spawn_request_dashboard.py",
+        "tests/test_spawn_request_dashboard_renderer.py",
         "tests/test_mysql55_schema_compat.py",
     ]
     for target in focused:
