@@ -16,11 +16,16 @@ REQUIRED_TABLES = {
 }
 
 
-def test_health_details_includes_optional_mysql_status() -> None:
+def test_health_details_includes_optional_mysql_status_and_security() -> None:
     response = client.get("/health/details")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+    assert "environment" in data
+    assert "security" in data
+    assert "api_key_auth_enabled" in data["security"]
+    assert "bind_host" in data["security"]
+    assert "warnings" in data["security"]
     assert "db_bridge_backend" in data
     assert "mysql" in data
     assert "enabled" in data["mysql"]
