@@ -25,6 +25,7 @@ AIA는 아래 역할을 소유합니다.
 
 - DB: `sql/aia_robot_spawn_request_mysql55.sql`
 - AIA seed script: `scripts/seed_robot_spawn_requests_mysql55.py`
+- AIA HTTP API: `POST /robot/spawn-requests`
 - Java 8 poller: `integration/java8/AiaRobotSpawnPoller.java`
 - Java 8 adapter: `integration/java8/AiaRobotSpawnAdapter.java`
 - Java 8 DTO: `integration/java8/AiaRobotSpawnRequest.java`
@@ -33,10 +34,24 @@ AIA는 아래 역할을 소유합니다.
 권장 적용 순서:
 
 1. 게임 DB에 `sql/aia_robot_spawn_request_mysql55.sql` 적용.
-2. AIA에서 `scripts/seed_robot_spawn_requests_mysql55.py` 실행해 `pending` 생성 요청 적재.
+2. AIA에서 `POST /robot/spawn-requests` 또는 `scripts/seed_robot_spawn_requests_mysql55.py`로 `pending` 생성 요청 적재.
 3. 게임서버 시작 루틴에서 `AiaRobotSpawnPoller.runOnce()` 호출.
 4. 서버별 `AiaRobotSpawnAdapter.createAndSpawn()` 안에 기존 `IdFactory`, robot DB insert, inventory/skill 지급, world spawn 로직 연결.
 5. 생성 성공 후 poller가 AIA `/robot/profile`에 자동 등록하고 요청 row를 `done`으로 변경.
+
+HTTP 생성 예시:
+
+```json
+POST /robot/spawn-requests
+{
+  "server_name": "main",
+  "count": 30,
+  "classes": ["knight", "elf", "wizard"],
+  "level_min": 1,
+  "level_max": 30,
+  "metadata": {"memo": "API 생성"}
+}
+```
 
 운영/복구 API:
 
@@ -54,6 +69,7 @@ AIA의 로봇 CRUD는 게임 서버의 실제 캐릭터 테이블을 직접 수�
 주요 API:
 
 - `GET /robot`: AIA가 알고 있는 `agent_id` 목록 조회.
+- `POST /robot/spawn-requests`: AIA 기준으로 spawn request 큐에 로봇 생성 요청 적재.
 - `POST /robot/profile`: 로봇 프로필 생성 또는 저장.
 - `PUT /robot/{agent_id}/profile`: 경로의 `agent_id` 기준으로 전체 프로필 교체.
 - `PATCH /robot/{agent_id}/profile`: 일부 프로필 필드 수정.
@@ -87,6 +103,7 @@ UTF-8 / MySQL 5.5 정책:
 
 ```bash
 pytest tests/test_robot_crud_api.py
+pytest tests/test_robot_spawn_request_api.py
 pytest tests/test_spawn_request_dashboard.py
 ```
 
@@ -148,6 +165,7 @@ python scripts/robot_crud_smoke.py
 
 - Python: `python -m compileall -q app scripts integration tests`
 - Robot CRUD API test: `pytest tests/test_robot_crud_api.py`
+- Robot Spawn Request API test: `pytest tests/test_robot_spawn_request_api.py`
 - Spawn Queue dashboard test: `pytest tests/test_spawn_request_dashboard.py`
 - Tests: `pytest`
 - Dependencies: `pip check`
