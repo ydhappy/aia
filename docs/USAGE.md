@@ -59,6 +59,12 @@ Linux:
 ./.venv/bin/python -m pip install -r requirements.txt
 ```
 
+자동 준비 스크립트:
+
+```bash
+python runners/setup/bootstrap_local.py
+```
+
 ## 4. 환경 설정
 
 `.env.example`을 `.env`로 복사한 뒤 서버 DB에 맞게 수정합니다.
@@ -97,13 +103,13 @@ mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 Windows:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/run_local_aia.py
+.\.venv\Scripts\python.exe runners/server/run_local_aia.py
 ```
 
 Linux:
 
 ```bash
-./.venv/bin/python scripts/run_local_aia.py
+./.venv/bin/python runners/server/run_local_aia.py
 ```
 
 실행 후 확인:
@@ -153,12 +159,11 @@ integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
 ```
 
-선택 파일:
+선택 예제:
 
 ```text
-integration/java8/AiaDecisionParser.java
-integration/java8/RobotCrudExample.java
-integration/java8/AiaRobotSpawnExample.java
+examples/java8/RobotCrudExample.java
+examples/java8/AiaRobotSpawnExample.java
 ```
 
 ## 9. 게임서버 시작 루틴 연결
@@ -317,8 +322,15 @@ pytest tests/test_spawn_request_dashboard.py
 pytest tests/test_mysql55_schema_compat.py
 ```
 
+Smoke 테스트:
+
+```bash
+python runners/smoke/ops_tick_smoke.py
+python runners/smoke/robot_crud_smoke.py
+```
+
 Windows 전체 점검:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
+powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
