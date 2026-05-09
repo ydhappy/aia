@@ -4,8 +4,11 @@
 
 ```http
 GET /health
+GET /health/details
 GET /metrics
 ```
+
+`/health`는 가벼운 생존 확인입니다. `/health/details`는 LLM, state store, DB bridge backend, 선택형 MySQL 연결 상태를 함께 보여줍니다.
 
 ## 판단
 
