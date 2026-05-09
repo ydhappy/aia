@@ -3,22 +3,23 @@
 AIA는 게임서버 옆에서 실행되는 **Python 기반 로봇 AI 브리지**입니다.
 게임서버는 실제 로봇 객체 생성, 이동, 공격, 스킬, 월드 등록을 담당하고 AIA는 판단, 프로필, 학습, 생성 요청 큐, 대시보드를 담당합니다.
 
-## 빠른 시작
+원클릭 실행 방식은 제거했습니다. 서버 연동 기준으로 직접 설치, DB 적용, AIA 실행, 게임서버 poller 연결 순서로 사용합니다.
 
-```bash
-python one_click_start.py
-```
+## 기본 사용 순서
 
-기본 주소:
+1. Python 가상환경 생성 및 의존성 설치.
+2. `.env` 설정.
+3. MySQL 5.5용 SQL 적용.
+4. AIA 실행.
+5. `POST /robot/spawn-requests`로 로봇 생성 요청 생성.
+6. 게임서버 Java 8 `AiaRobotSpawnPoller`와 `AiaRobotSpawnAdapter` 연결.
+7. `/api/v1/robot/ops-tick`으로 판단 루프 연동.
+8. `/dashboard/robot-spawn-queue/gui`와 `/dashboard/robot-ai/gui`로 운영 확인.
+
+자세한 사용방법:
 
 ```text
-http://127.0.0.1:8000
-```
-
-상세 시작 문서:
-
-```text
-docs/QUICKSTART.md
+docs/USAGE.md
 ```
 
 ## 핵심 구조
@@ -39,7 +40,7 @@ AIA
   - dashboard/gui
 ```
 
-## 로봇 없는 서버 연동
+## 로봇 없는 서버 연동 요약
 
 1. 게임 DB에 MySQL 5.5용 큐 테이블 적용.
 
@@ -105,7 +106,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
 
 ```text
 README.md
-docs/QUICKSTART.md
+docs/USAGE.md
 docs/SERVER-INTEGRATION.md
 docs/API.md
 ```
