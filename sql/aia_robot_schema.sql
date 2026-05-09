@@ -1,6 +1,9 @@
 -- AIA robot database contract for MySQL / MariaDB.
 -- Server-owned robot tables stay limited to: robot, robot_clan, robot_setting.
 -- AIA-owned tables use the aia_* prefix so operators can audit them safely.
+-- DELETE /robot/{agent_id} clears AIA runtime store only; it does not delete these DB bridge rows.
+-- Operators may purge aia_* rows manually after backup, but AIA never deletes server-owned robot tables.
+-- Recommended production charset is utf8mb4. Legacy utf8 remains for compatibility with older MySQL/MariaDB installs.
 
 CREATE TABLE IF NOT EXISTS aia_robot_state (
     robot_uid INT(10) UNSIGNED NOT NULL,
