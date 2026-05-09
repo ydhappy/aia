@@ -87,6 +87,22 @@ class RobotProfilePatchRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class RobotSpawnRequestCreateRequest(BaseModel):
+    server_name: str = "main"
+    count: int = Field(default=30, ge=1, le=500)
+    request_prefix: str = "aia-api"
+    agent_prefix: str = "aia_robot"
+    name_prefix: str = "AIA로봇"
+    classes: list[str] = Field(default_factory=lambda: ["knight", "elf", "wizard"])
+    level_min: int = Field(default=1, ge=1)
+    level_max: int = Field(default=30, ge=1)
+    priority: int = Field(default=100, ge=0, le=10000)
+    default_x: int = 32670
+    default_y: int = 32790
+    default_map: int = 4
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class RobotEventRequest(BaseModel):
     agent_id: str
     tick: int = Field(ge=0)
