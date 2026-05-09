@@ -1,4 +1,9 @@
-package integration.java8;
+package examples.java8;
+
+import integration.java8.AiaRobotSpawnAdapter;
+import integration.java8.AiaRobotSpawnPoller;
+import integration.java8.AiaRobotSpawnRequest;
+import integration.java8.LocalAiaClient;
 
 public class AiaRobotSpawnExample {
     public static void main(String[] args) throws Exception {
