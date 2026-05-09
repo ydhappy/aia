@@ -40,10 +40,18 @@ AIA의 로봇 CRUD는 게임 서버의 실제 캐릭터 테이블을 직접 수�
 2. 수정: 일부 수정은 `PATCH /robot/{agent_id}/profile`, 전체 재동기화는 `PUT /robot/{agent_id}/profile` 사용.
 3. 삭제: 서버 월드에서 despawn/offline 처리 → `DELETE /robot/{agent_id}` → 서버 DB 캐릭터/로봇 테이블 삭제 또는 비활성화.
 
+DB bridge 삭제 정책:
+
+- `DELETE /robot/{agent_id}`는 AIA 런타임 store만 삭제합니다.
+- `aia_robot_state`, `aia_robot_event`, `aia_robot_feedback`, `aia_robot_decision`, `aia_robot_trace_summary` 같은 DB bridge 테이블은 자동 삭제하지 않습니다.
+- 서버 원본 `robot`, `robot_clan`, `robot_setting` 테이블은 AIA가 절대 삭제하지 않습니다.
+- 운영자가 `aia_*` 행을 정리할 경우 백업 후 수동 purge 또는 별도 유지보수 스크립트로 처리합니다.
+
 UTF-8 정책:
 
 - HTTP JSON은 UTF-8 기준입니다.
 - Redis store는 JSON 저장 시 `ensure_ascii=false` 정책을 사용합니다.
+- DB bridge JSON 저장도 `ensure_ascii=false` 정책을 사용합니다.
 - Java 연동부는 `Content-Type: application/json; charset=utf-8`, 로그/파일/DB는 UTF-8 또는 `utf8mb4`를 권장합니다.
 
 관련 회귀 테스트:
