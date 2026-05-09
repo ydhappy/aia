@@ -58,10 +58,7 @@ public class AiaRobotSpawnRequest {
         String safeClassType = json(classType);
         String safeServer = json(serverName);
         String safeHuntZone = json(huntZoneId);
-        String metadata = metadataJson;
-        if (metadata == null || metadata.trim().length() == 0) {
-            metadata = "{}";
-        }
+        String safeRaw = json(metadataJson == null ? "" : metadataJson);
         return "{"
                 + "\"agent_id\":\"" + safeAgentId + "\","
                 + "\"name\":\"" + safeName + "\","
@@ -75,10 +72,12 @@ public class AiaRobotSpawnRequest {
                 + "\"class_type\":\"" + safeClassType + "\","
                 + "\"class_id\":" + classId + ","
                 + "\"level\":" + level + ","
+                + "\"loc_x\":" + locX + ","
+                + "\"loc_y\":" + locY + ","
                 + "\"loc_map\":" + locMap + ","
                 + "\"home_map\":" + homeMap + ","
                 + "\"hunt_zone_id\":\"" + safeHuntZone + "\","
-                + "\"raw\":" + metadata
+                + "\"raw_json\":\"" + safeRaw + "\""
                 + "}"
                 + "}";
     }
