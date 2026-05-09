@@ -94,12 +94,6 @@
 
 ## Part 5. 스크립트 / 품질 게이트 - 완료
 
-대상:
-
-- `scripts/*.py`
-- `scripts/*.ps1`
-- `tests/*.py`
-
 체크 결과:
 
 - 원클릭 관련 잔여 검색 완료: 남은 참조 없음.
@@ -117,7 +111,7 @@
 - `refactor: improve ops tick smoke errors`
 - `refactor: improve robot CRUD smoke errors`
 
-## Part 6. GUI / Dashboard - 다음 진행 대상
+## Part 6. GUI / Dashboard - 완료
 
 대상:
 
@@ -125,14 +119,26 @@
 - `app/services/spawn_request_dashboard_service.py`
 - `app/services/robot_ai_ops_service.py`
 
-체크:
+체크 결과:
 
-- spawn queue 필터/복구 UX
-- HTML escape 누락 여부
-- MySQL 미연결 fallback 화면
-- 운영자가 즉시 볼 수 있는 상태 정보 보강
+- Spawn Queue JSON 응답에 `total`, `needs_attention`, `operator_hint` 추가.
+- DB backend가 MySQL이 아닐 때 운영자 조치 문구 표시.
+- MySQL 연결/권한/테이블 오류 시 조치 문구 표시.
+- 상태 카드가 `pending/claimed/done/failed` 네 가지를 항상 표시하도록 개선.
+- GUI 상단에 정상/확인 필요 배너 추가.
+- 최근 요청 테이블에 `request_id`, `priority`, `created_at` 표시 추가.
+- failed retry / claimed recovery 버튼을 GUI에 추가.
+- form body 방식 대신 query API에 맞춘 JavaScript `fetch()` 호출로 수정.
+- HTML 출력은 기존 `escape()` 기반 유지.
+- GUI 테스트에 새 필드와 버튼 동작 문구 검증 추가.
 
-## Part 7. 최종 정리
+주요 커밋:
+
+- `feat: improve spawn queue dashboard UX`
+- `fix: make spawn queue recovery buttons call query APIs`
+- `test: cover improved spawn queue dashboard UX`
+
+## Part 7. 최종 정리 - 다음 진행 대상
 
 체크:
 
