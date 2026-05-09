@@ -74,6 +74,74 @@ CREATE TABLE IF NOT EXISTS aia_robot_trace_summary (
 """
 
 
+MYSQL_BRIDGE_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS aia_robot_state (
+    robot_uid BIGINT(20) UNSIGNED NOT NULL,
+    name VARCHAR(45) NOT NULL DEFAULT '',
+    hp INT(10) NOT NULL DEFAULT 0,
+    mp INT(10) NOT NULL DEFAULT 0,
+    hp_percent INT(10) NOT NULL DEFAULT 0,
+    ai_status INT(10) NOT NULL DEFAULT 0,
+    mode INT(10) NOT NULL DEFAULT -1,
+    mode_label VARCHAR(30) NOT NULL DEFAULT '',
+    stall_count INT(10) NOT NULL DEFAULT 0,
+    nav_fail INT(10) NOT NULL DEFAULT 0,
+    last_active DATETIME NULL DEFAULT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (robot_uid),
+    KEY idx_aia_robot_state_updated (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS aia_robot_event (
+    uid BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    object_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+    name VARCHAR(45) NOT NULL DEFAULT '',
+    action_type VARCHAR(40) NOT NULL DEFAULT '',
+    detail VARCHAR(255) NOT NULL DEFAULT '',
+    loc_x INT(10) NOT NULL DEFAULT 0,
+    loc_y INT(10) NOT NULL DEFAULT 0,
+    loc_map INT(10) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (uid),
+    KEY idx_aia_robot_event_object (object_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS aia_robot_feedback (
+    uid BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    agent_id VARCHAR(64) NOT NULL DEFAULT '',
+    tick BIGINT(20) NULL,
+    action VARCHAR(32) NOT NULL DEFAULT '',
+    reward DOUBLE NULL,
+    outcome VARCHAR(32) NULL,
+    map_id INT(10) NOT NULL DEFAULT 0,
+    context_json LONGTEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (uid),
+    KEY idx_aia_robot_feedback_agent (agent_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS aia_robot_decision (
+    uid BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    agent_id VARCHAR(64) NOT NULL DEFAULT '',
+    tick BIGINT(20) NULL,
+    action VARCHAR(32) NOT NULL DEFAULT '',
+    action_args_json LONGTEXT NULL,
+    confidence DOUBLE NULL,
+    source VARCHAR(64) NULL,
+    reason VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (uid),
+    KEY idx_aia_robot_decision_agent (agent_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE IF NOT EXISTS aia_robot_trace_summary (
+    uid BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    agent_id VARCHAR(64) NOT NULL DEFAULT '',
+    tick BIGINT(20) NULL,
+    trace_json LONGTEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (uid),
+    KEY idx_aia_robot_trace_agent (agent_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+"""
+
+
 class DBBridgeService:
     def __init__(self) -> None:
         self.backend = settings.db_bridge_backend.lower()
@@ -135,16 +203,9 @@ class DBBridgeService:
     def _init_mysql_schema(self) -> None:
         if pymysql is None:
             return
-        ddl = (
-            SCHEMA_SQL.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGINT PRIMARY KEY AUTO_INCREMENT")
-            .replace("INTEGER PRIMARY KEY", "BIGINT PRIMARY KEY AUTO_INCREMENT")
-            .replace("INTEGER", "INT")
-            .replace("REAL", "DOUBLE")
-            .replace("TIMESTAMP DEFAULT CURRENT_TIMESTAMP", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-        )
         with self._mysql_connect() as conn:
             with conn.cursor() as cur:
-                for stmt in [s.strip() for s in ddl.split(';') if s.strip()]:
+                for stmt in [s.strip() for s in MYSQL_BRIDGE_SCHEMA_SQL.split(';') if s.strip()]:
                     cur.execute(stmt)
 
     def poll_states(self) -> list[dict]:
