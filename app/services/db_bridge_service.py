@@ -110,6 +110,7 @@ class DBBridgeService:
             password=parsed.password or "",
             database=(parsed.path or "/aia").lstrip("/"),
             autocommit=True,
+            charset="utf8mb4",
             cursorclass=pymysql.cursors.DictCursor,
         )
 
@@ -209,7 +210,7 @@ class DBBridgeService:
             row.get("agent_id"),
             row.get("tick"),
             row.get("action"),
-            json.dumps(row.get("action_args", {})),
+            json.dumps(row.get("action_args", {}), ensure_ascii=False),
             row.get("confidence"),
             row.get("source"),
             row.get("reason"),
@@ -220,7 +221,7 @@ class DBBridgeService:
         return [(
             row.get("agent_id"),
             row.get("tick"),
-            json.dumps(row.get("trace", {})),
+            json.dumps(row.get("trace", {}), ensure_ascii=False),
         ) for row in limited]
 
     def write_decision(self, decision_row: dict) -> dict:
