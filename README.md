@@ -133,13 +133,20 @@ Windows 전체 게이트:
 powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
 
+선택형 MySQL 통합 테스트:
+
+```bash
+AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
+python -m pytest tests/test_mysql_spawn_queue_integration.py
+```
+
 GitHub Actions:
 
 ```text
 .github/workflows/aia-ci.yml
 ```
 
-push, pull request, 수동 실행 시 Python 테스트와 Java 8 컴파일을 실행합니다.
+push, pull request, 수동 실행 시 기본 품질 게이트와 MariaDB 기반 spawn queue 통합 테스트를 실행합니다.
 
 ## 유지 문서
 
