@@ -192,7 +192,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 - `/decide`
 - `/api/v1/robot/sync`
 - `/robot/feedback`
-호출
+- `/robot` CRUD API 호출
 
 ### DB 혼합형 poller
 - `integration/java8/DbDecisionPoller.java`
@@ -231,6 +231,13 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ### Robot CRUD API 테스트
 - `pytest tests/test_robot_crud_api.py`
+
+### HTTP smoke
+- `python scripts/ops_tick_smoke.py`
+- `python scripts/robot_crud_smoke.py`
+
+### 전체 품질 게이트
+- `powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1`
 
 ---
 
