@@ -12,6 +12,9 @@ def test_spawn_request_dashboard_json_falls_back_without_mysql() -> None:
     data = response.json()
     assert "enabled" in data
     assert "counts" in data
+    assert "total" in data
+    assert "needs_attention" in data
+    assert "operator_hint" in data
     assert "recent" in data
 
 
@@ -29,7 +32,11 @@ def test_spawn_request_dashboard_gui_renders_without_mysql() -> None:
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "AIA Robot Spawn Queue" in response.text
-    assert "현재 필터" in response.text
+    assert "needs_attention" in response.text
+    assert "failed 재시도" in response.text
+    assert "claimed 복구" in response.text
+    assert "postAction" in response.text
+    assert "recoverClaimed" in response.text
 
 
 def test_spawn_request_retry_failed_falls_back_without_mysql() -> None:
