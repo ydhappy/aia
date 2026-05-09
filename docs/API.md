@@ -53,15 +53,45 @@ POST /robot/spawn-requests
 }
 ```
 
+응답 주요 필드:
+
+```text
+accepted
+created
+submitted
+affected
+duplicate_policy
+required_table
+requests
+```
+
 ## Spawn Queue 대시보드
 
 ```http
-GET  /dashboard/robot-spawn-queue
-GET  /dashboard/robot-spawn-queue/gui
-GET  /dashboard/robot-spawn-queue?status=failed
-GET  /dashboard/robot-spawn-queue/gui?status=failed
-POST /dashboard/robot-spawn-queue/retry-failed
-POST /dashboard/robot-spawn-queue/recover-claimed
+GET /dashboard/robot-spawn-queue
+GET /dashboard/robot-spawn-queue/gui
+GET /dashboard/robot-spawn-queue?status=failed
+GET /dashboard/robot-spawn-queue/gui?status=failed
+```
+
+응답 주요 필드:
+
+```text
+enabled
+reason
+operator_hint
+status_filter
+counts
+total
+needs_attention
+recent
+```
+
+복구 API:
+
+```http
+POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
+POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
 
 ## 로봇 이벤트/학습
