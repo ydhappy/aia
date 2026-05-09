@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import json
 import time
-from urllib.parse import urlparse
 
 from app.core.config import settings
+from app.core.mysql import connect_mysql
 from app.models.request_models import RobotSpawnRequestCreateRequest
 from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
-
-try:
-    import pymysql
-except Exception:  # pragma: no cover
-    pymysql = None
 
 
 CLASS_IDS = {
@@ -24,19 +19,7 @@ CLASS_IDS = {
 
 class RobotSpawnRequestService:
     def _connect(self):
-        if pymysql is None:
-            raise RuntimeError("pymysql_not_installed")
-        parsed = urlparse(settings.db_bridge_mysql_dsn.replace("mysql+pymysql://", "mysql://"))
-        return pymysql.connect(
-            host=parsed.hostname or "localhost",
-            port=parsed.port or 3306,
-            user=parsed.username or "root",
-            password=parsed.password or "",
-            database=(parsed.path or "/aia").lstrip("/"),
-            autocommit=True,
-            charset="utf8",
-            cursorclass=pymysql.cursors.DictCursor,
-        )
+        return connect_mysql(settings.db_bridge_mysql_dsn)
 
     def create_requests(self, request: RobotSpawnRequestCreateRequest) -> dict:
         if settings.db_bridge_backend.lower() != "mysql":
@@ -100,13 +83,7 @@ class RobotSpawnRequestService:
         profiles = config.get("class_profiles", {}) if isinstance(config.get("class_profiles"), dict) else {}
         return profiles.get(class_type) or profiles.get("default") or {"role": "custom", "style": "balanced"}
 
-    def _build_row(
-        self,
-        request: RobotSpawnRequestCreateRequest,
-        index: int,
-        zone: dict,
-        class_type: str,
-    ) -> dict:
+    def _build_row(self, request: RobotSpawnRequestCreateRequest, index: int, zone: dict, class_type: str) -> dict:
         profile = self._class_profile(class_type)
         class_id = CLASS_IDS.get(class_type, 1)
         agent_id = "%s_%04d" % (self._safe_token(request.agent_prefix), index)
@@ -164,25 +141,9 @@ class RobotSpawnRequestService:
             cur.execute(
                 sql,
                 (
-                    row["request_id"],
-                    row["server_name"],
-                    row["agent_id"],
-                    row["name"],
-                    row["class_type"],
-                    row["class_id"],
-                    row["level"],
-                    row["loc_x"],
-                    row["loc_y"],
-                    row["loc_map"],
-                    row["heading"],
-                    row["role"],
-                    row["style"],
-                    row["home_x"],
-                    row["home_y"],
-                    row["home_map"],
-                    row["hunt_zone_id"],
-                    row["priority"],
-                    row["metadata_json"],
+                    row["request_id"], row["server_name"], row["agent_id"], row["name"], row["class_type"], row["class_id"], row["level"],
+                    row["loc_x"], row["loc_y"], row["loc_map"], row["heading"], row["role"], row["style"], row["home_x"], row["home_y"],
+                    row["home_map"], row["hunt_zone_id"], row["priority"], row["metadata_json"],
                 ),
             )
             return int(cur.rowcount or 0)
