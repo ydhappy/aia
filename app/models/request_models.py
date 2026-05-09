@@ -71,6 +71,22 @@ class RobotProfileRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class RobotProfilePatchRequest(BaseModel):
+    name: str | None = None
+    role: RobotRole | None = None
+    style: RobotStyle | None = None
+    party_id: str | None = None
+    clan_id: str | None = None
+    home_x: int | None = None
+    home_y: int | None = None
+    patrol_points: list[dict[str, int]] | None = None
+    preferred_skills: list[str] | None = None
+    banned_skills: list[str] | None = None
+    tags: list[str] | None = None
+    notes: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+
+
 class RobotEventRequest(BaseModel):
     agent_id: str
     tick: int = Field(ge=0)
