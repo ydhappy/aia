@@ -47,12 +47,13 @@ DB bridge 삭제 정책:
 - 서버 원본 `robot`, `robot_clan`, `robot_setting` 테이블은 AIA가 절대 삭제하지 않습니다.
 - 운영자가 `aia_*` 행을 정리할 경우 백업 후 수동 purge 또는 별도 유지보수 스크립트로 처리합니다.
 
-UTF-8 정책:
+UTF-8 / MySQL 5.5 정책:
 
 - HTTP JSON은 UTF-8 기준입니다.
 - Redis store는 JSON 저장 시 `ensure_ascii=false` 정책을 사용합니다.
 - DB bridge JSON 저장도 `ensure_ascii=false` 정책을 사용합니다.
-- Java 연동부는 `Content-Type: application/json; charset=utf-8`, 로그/파일/DB는 UTF-8 또는 `utf8mb4`를 권장합니다.
+- MySQL 5.5 호환을 위해 SQL 기본 charset은 `utf8`을 사용합니다.
+- Java 연동부는 `Content-Type: application/json; charset=utf-8`, 로그/파일/DB는 UTF-8을 권장합니다.
 
 관련 회귀 테스트:
 
