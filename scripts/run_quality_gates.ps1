@@ -35,6 +35,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Output "SPAWN_REQUEST_DASHBOARD_PYTEST_EXIT=0"
 
+& $Python -m pytest tests/test_mysql55_schema_compat.py
+if ($LASTEXITCODE -ne 0) {
+    throw "MySQL 5.5 schema compatibility pytest failed: $LASTEXITCODE"
+}
+Write-Output "MYSQL55_SCHEMA_COMPAT_PYTEST_EXIT=0"
+
 & $Python -m pytest
 if ($LASTEXITCODE -ne 0) {
     throw "pytest failed: $LASTEXITCODE"
