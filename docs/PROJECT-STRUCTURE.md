@@ -23,15 +23,7 @@ runners/db/          DB seed/운영용 실행 스크립트
 runners/quality/     품질 게이트 실행
 ```
 
-## 예제 코드
-
-```text
-examples/java8/      Java 8 main 예제
-```
-
-`examples/java8/`의 package는 `examples.java8`입니다. 예제는 `integration.java8.*`를 import해서 사용하는 샘플이며, 실제 서버에 복사할 필수 코드는 아닙니다.
-
-## 실행 예시
+## 실행 명령
 
 AIA 실행:
 
@@ -74,6 +66,5 @@ build/java8-classes/
 
 - `app/`에는 실행용 main script를 두지 않습니다.
 - `integration/java8/`에는 서버에 복사할 계약/클라이언트 코드만 둡니다.
-- `examples/java8/`에는 실행 가능한 Java main 예제만 둡니다.
 - `runners/`에는 사람이 직접 실행하는 파일만 둡니다.
-- Java 예제는 `examples.java8` package를 사용하고, 서버 연동 코드는 `integration.java8` package를 사용합니다.
+- 예제/샘플 전용 코드는 유지하지 않습니다.
