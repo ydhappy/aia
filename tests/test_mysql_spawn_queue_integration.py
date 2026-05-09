@@ -13,6 +13,20 @@ from app.services.spawn_request_dashboard_service import spawn_request_dashboard
 
 
 MYSQL_DSN = os.environ.get("AIA_TEST_MYSQL_DSN", "")
+REQUIRED_TABLES = [
+    "aia_robot_spawn_request",
+    "aia_robot_state",
+    "aia_robot_event",
+    "aia_robot_feedback",
+    "aia_robot_decision",
+    "aia_robot_trace_summary",
+]
+
+
+def _apply_sql_file(cur, path: str) -> None:
+    sql = Path(path).read_text(encoding="utf-8")
+    for stmt in [item.strip() for item in sql.split(";") if item.strip() and not item.strip().startswith("-- Example")]:
+        cur.execute(stmt)
 
 
 @pytest.mark.skipif(not MYSQL_DSN, reason="AIA_TEST_MYSQL_DSN is not configured")
@@ -25,15 +39,16 @@ def test_mysql_spawn_queue_create_retry_recover_and_health() -> None:
     agent_prefix = "ci_robot_%d" % int(time.time())
     try:
         with connect_mysql(MYSQL_DSN) as conn:
-            sql = Path("sql/aia_robot_spawn_request_mysql55.sql").read_text(encoding="utf-8")
             with conn.cursor() as cur:
-                for stmt in [item.strip() for item in sql.split(";") if item.strip() and not item.strip().startswith("-- Example")]:
-                    cur.execute(stmt)
+                _apply_sql_file(cur, "sql/aia_robot_schema.sql")
+                _apply_sql_file(cur, "sql/aia_robot_spawn_request_mysql55.sql")
                 cur.execute("DELETE FROM aia_robot_spawn_request WHERE request_id LIKE %s", (prefix + "%",))
 
         health = health_details()
         assert health["mysql"]["status"] == "ok"
-        assert health["mysql"]["tables"]["aia_robot_spawn_request"]["exists"] is True
+        assert health["mysql"]["missing_tables"] == []
+        for table_name in REQUIRED_TABLES:
+            assert health["mysql"]["tables"][table_name]["exists"] is True
 
         create_result = robot_spawn_request_service.create_requests(
             RobotSpawnRequestCreateRequest(
