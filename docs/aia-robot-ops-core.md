@@ -52,6 +52,12 @@ UTF-8 정책:
 pytest tests/test_robot_crud_api.py
 ```
 
+AIA 실행 후 HTTP smoke:
+
+```bash
+python scripts/robot_crud_smoke.py
+```
+
 ## Ops Tick API
 
 `POST /api/v1/robot/ops-tick`
@@ -101,18 +107,19 @@ pytest tests/test_robot_crud_api.py
 ## Required Gates
 
 - Python: `python -m compileall -q app scripts integration tests`
+- Robot CRUD API test: `pytest tests/test_robot_crud_api.py`
 - Tests: `pytest`
-- Robot CRUD API: `pytest tests/test_robot_crud_api.py`
 - Dependencies: `pip check`
-- Java 8 integration sample: `javac integration/java8/*.java`
+- Java 8 integration sample: `javac -encoding UTF-8 integration/java8/*.java`
 - Windows one-shot: `powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1`
-- HTTP smoke: run AIA, then `python scripts/ops_tick_smoke.py`
+- Ops tick HTTP smoke: run AIA, then `python scripts/ops_tick_smoke.py`
+- Robot CRUD HTTP smoke: run AIA, then `python scripts/robot_crud_smoke.py`
 
 배포 전에는 runtime issue count, fallback rate, dashboard warning을 0에 가깝게 유지해야 합니다.
 
 ## Runtime Adapters
 
-- Python: `examples/python_client.py`, `scripts/ops_tick_smoke.py`
-- Java 8: `integration/java8/LocalAiaClient.java`, `integration/java8/AiaDecisionParser.java`
+- Python: `examples/python_client.py`, `scripts/ops_tick_smoke.py`, `scripts/robot_crud_smoke.py`
+- Java 8: `integration/java8/LocalAiaClient.java`, `integration/java8/AiaDecisionParser.java`, `integration/java8/RobotCrudExample.java`
 - Jython 2.7: `integration/jython/aia_ops_tick_client.py`
 - Script: `scripts/run_quality_gates.ps1`
