@@ -17,6 +17,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Output "COMPILEALL_EXIT=0"
 
+& $Python -m pytest tests/test_robot_crud_api.py
+if ($LASTEXITCODE -ne 0) {
+    throw "robot CRUD API pytest failed: $LASTEXITCODE"
+}
+Write-Output "ROBOT_CRUD_PYTEST_EXIT=0"
+
 & $Python -m pytest
 if ($LASTEXITCODE -ne 0) {
     throw "pytest failed: $LASTEXITCODE"
