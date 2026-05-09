@@ -9,6 +9,7 @@
 - 센서 스냅샷 전송: hp, mp, 좌표, 맵, 타겟, 주변 몬스터 레벨, 안전지대, 인벤토리, 위험 핫스팟.
 - 최종 실행 검증: 이동 가능 타일, 맵 일치, 안전지대 전투 금지, 타겟 생존/거리.
 - 실제 실행: 이동, 공격, 스킬/아이템 사용, 귀환, DB flush.
+- 실제 로봇 객체/캐릭터 생성, 삭제, 월드 despawn, DB 캐릭터 테이블 정리.
 
 AIA는 아래 역할을 소유합니다.
 
@@ -16,6 +17,40 @@ AIA는 아래 역할을 소유합니다.
 - 토크, 학습, 성장, 이슈 체크리스트, 운영 대시보드.
 - 다른 서버에서도 사용할 수 있는 `/api/v1/robot/ops-tick` 단일 운영 API.
 - 서버 로봇북/토크 DB가 비어 있어도 AIA 기본 기준으로 사냥터/토크를 생성.
+- 로봇 profile/state/event/trace/learning cache의 AIA 내부 CRUD.
+
+## Robot CRUD Contract
+
+AIA의 로봇 CRUD는 게임 서버의 실제 캐릭터 테이블을 직접 수정하지 않습니다. AIA 내부 판단에 필요한 profile, 마지막 state, 최근 event, trace, learning state만 관리합니다.
+
+주요 API:
+
+- `GET /robot`: AIA가 알고 있는 `agent_id` 목록 조회.
+- `POST /robot/profile`: 로봇 프로필 생성 또는 저장.
+- `PUT /robot/{agent_id}/profile`: 경로의 `agent_id` 기준으로 전체 프로필 교체.
+- `PATCH /robot/{agent_id}/profile`: 일부 프로필 필드 수정.
+- `GET /robot/{agent_id}`: profile, recent events, last state 조회.
+- `DELETE /robot/{agent_id}`: AIA 내부 state/profile/events/trace/learning 삭제.
+
+없는 로봇에 대해 `GET /robot/{agent_id}`, `PATCH /robot/{agent_id}/profile`, `DELETE /robot/{agent_id}`를 호출하면 `404`와 `robot_not_found`를 반환합니다.
+
+게임 서버 권장 순서:
+
+1. 생성: 서버 DB/월드 객체 생성 → `POST /robot/profile` → 첫 tick에서 `POST /api/v1/robot/ops-tick` 또는 `/observe` 전송.
+2. 수정: 일부 수정은 `PATCH /robot/{agent_id}/profile`, 전체 재동기화는 `PUT /robot/{agent_id}/profile` 사용.
+3. 삭제: 서버 월드에서 despawn/offline 처리 → `DELETE /robot/{agent_id}` → 서버 DB 캐릭터/로봇 테이블 삭제 또는 비활성화.
+
+UTF-8 정책:
+
+- HTTP JSON은 UTF-8 기준입니다.
+- Redis store는 JSON 저장 시 `ensure_ascii=false` 정책을 사용합니다.
+- Java 연동부는 `Content-Type: application/json; charset=utf-8`, 로그/파일/DB는 UTF-8 또는 `utf8mb4`를 권장합니다.
+
+관련 회귀 테스트:
+
+```bash
+pytest tests/test_robot_crud_api.py
+```
 
 ## Ops Tick API
 
@@ -67,6 +102,7 @@ AIA는 아래 역할을 소유합니다.
 
 - Python: `python -m compileall -q app scripts integration tests`
 - Tests: `pytest`
+- Robot CRUD API: `pytest tests/test_robot_crud_api.py`
 - Dependencies: `pip check`
 - Java 8 integration sample: `javac integration/java8/*.java`
 - Windows one-shot: `powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1`
