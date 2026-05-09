@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -21,10 +22,19 @@ def request_json(method: str, path: str, payload: dict | None = None, expected_s
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             status = response.getcode()
-            data = json.loads(response.read().decode("utf-8"))
+            raw = response.read().decode("utf-8")
+            data = json.loads(raw or "{}")
     except urllib.error.HTTPError as exc:
         status = exc.code
-        data = json.loads(exc.read().decode("utf-8"))
+        raw = exc.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            raise RuntimeError("%s %s returned non-JSON HTTP %s: %s" % (method, path, status, raw))
+    except urllib.error.URLError as exc:
+        raise RuntimeError("AIA server not reachable at %s: %s" % (BASE_URL, exc))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("%s %s returned non-JSON response: %s" % (method, path, exc))
     if status != expected_status:
         raise RuntimeError("%s %s expected %s got %s: %s" % (method, path, expected_status, status, data))
     return data
@@ -68,4 +78,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print("ROBOT_CRUD_SMOKE_FAILED=%s" % exc, file=sys.stderr)
+        raise
