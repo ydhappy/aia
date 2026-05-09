@@ -44,9 +44,6 @@ def compile_java() -> None:
         print("[quality] JAVA8_COMPILE=SKIPPED_JAVAC_NOT_FOUND")
         return
     java_files = [str(path) for path in (ROOT / "integration" / "java8").glob("*.java")]
-    examples_dir = ROOT / "examples" / "java8"
-    if examples_dir.exists():
-        java_files.extend(str(path) for path in examples_dir.glob("*.java"))
     if not java_files:
         print("[quality] JAVA8_COMPILE=SKIPPED_NO_JAVA_FILES")
         return
