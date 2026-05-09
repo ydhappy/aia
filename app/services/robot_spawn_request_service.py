@@ -43,7 +43,10 @@ class RobotSpawnRequestService:
             return {
                 "accepted": False,
                 "reason": "db_bridge_backend_not_mysql",
+                "required_table": "aia_robot_spawn_request",
                 "created": 0,
+                "submitted": 0,
+                "affected": 0,
                 "requests": [],
             }
         zones = self._enabled_zones() or [
@@ -55,41 +58,36 @@ class RobotSpawnRequestService:
                 "min_level": request.level_min,
             }
         ]
-        classes = [str(item).strip() for item in request.classes if str(item).strip()] or ["knight"]
-        created: list[dict] = []
+        classes = [self._safe_class(item) for item in request.classes if self._safe_class(item)] or ["knight"]
+        submitted_rows: list[dict] = []
+        affected = 0
         try:
             with self._connect() as conn:
                 for index in range(1, request.count + 1):
                     zone = zones[(index - 1) % len(zones)]
                     class_type = classes[(index - 1) % len(classes)]
                     row = self._build_row(request, index, zone, class_type)
-                    self._insert_row(conn, row)
-                    created.append(row)
+                    affected += self._insert_row(conn, row)
+                    submitted_rows.append(row)
             return {
                 "accepted": True,
-                "server_name": request.server_name,
-                "created": len(created),
-                "requests": [
-                    {
-                        "request_id": row["request_id"],
-                        "agent_id": row["agent_id"],
-                        "name": row["name"],
-                        "class_type": row["class_type"],
-                        "level": row["level"],
-                        "loc_x": row["loc_x"],
-                        "loc_y": row["loc_y"],
-                        "loc_map": row["loc_map"],
-                        "status": "pending",
-                    }
-                    for row in created
-                ],
+                "server_name": self._safe_token(request.server_name)[:64] or "main",
+                "created": len(submitted_rows),
+                "submitted": len(submitted_rows),
+                "affected": affected,
+                "duplicate_policy": "same request_id is updated; failed rows are reset to pending",
+                "required_table": "aia_robot_spawn_request",
+                "requests": [self._public_row(row) for row in submitted_rows],
             }
         except Exception as exc:
             return {
                 "accepted": False,
                 "reason": str(exc),
-                "created": len(created),
-                "requests": created,
+                "required_table": "aia_robot_spawn_request",
+                "created": len(submitted_rows),
+                "submitted": len(submitted_rows),
+                "affected": affected,
+                "requests": [self._public_row(row) for row in submitted_rows],
             }
 
     def _enabled_zones(self) -> list[dict]:
@@ -149,7 +147,7 @@ class RobotSpawnRequestService:
             "metadata_json": json.dumps(metadata, ensure_ascii=False),
         }
 
-    def _insert_row(self, conn, row: dict) -> None:
+    def _insert_row(self, conn, row: dict) -> int:
         sql = """
             INSERT INTO aia_robot_spawn_request
             (request_id, server_name, agent_id, name, class_type, class_id, level,
@@ -187,6 +185,23 @@ class RobotSpawnRequestService:
                     row["metadata_json"],
                 ),
             )
+            return int(cur.rowcount or 0)
+
+    def _public_row(self, row: dict) -> dict:
+        return {
+            "request_id": row["request_id"],
+            "agent_id": row["agent_id"],
+            "name": row["name"],
+            "class_type": row["class_type"],
+            "level": row["level"],
+            "loc_x": row["loc_x"],
+            "loc_y": row["loc_y"],
+            "loc_map": row["loc_map"],
+            "status": "pending",
+        }
+
+    def _safe_class(self, value: str) -> str:
+        return self._safe_token(str(value).strip().lower())[:20]
 
     def _safe_token(self, value: str) -> str:
         return "".join(ch for ch in str(value or "") if ch.isalnum() or ch in {"_", "-"})
