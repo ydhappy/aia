@@ -33,3 +33,39 @@ jobs:
 
       - name: Run quality gates
         run: python runners/quality/run_quality_gates.py
+
+  mysql-spawn-queue:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.5
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: aia_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run optional MySQL spawn queue integration test
+        env:
+          AIA_TEST_MYSQL_DSN: mysql+pymysql://root:root@127.0.0.1:3306/aia_ci
+        run: python -m pytest tests/test_mysql_spawn_queue_integration.py
