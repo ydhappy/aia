@@ -112,6 +112,8 @@ docs/API.md
 
 ## 테스트
 
+개별 테스트:
+
 ```bash
 pytest tests/test_robot_crud_api.py
 pytest tests/test_robot_spawn_request_api.py
@@ -119,11 +121,25 @@ pytest tests/test_spawn_request_dashboard.py
 pytest tests/test_mysql55_schema_compat.py
 ```
 
+Linux/GitHub Actions용 전체 게이트:
+
+```bash
+python runners/quality/run_quality_gates.py
+```
+
 Windows 전체 게이트:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
+
+GitHub Actions:
+
+```text
+.github/workflows/aia-ci.yml
+```
+
+push, pull request, 수동 실행 시 Python 테스트와 Java 8 컴파일을 실행합니다.
 
 ## 유지 문서
 
