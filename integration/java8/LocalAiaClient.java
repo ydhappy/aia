@@ -2,6 +2,7 @@ package integration.java8;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
@@ -13,10 +14,17 @@ import java.net.URLEncoder;
 public class LocalAiaClient {
     private final String baseUrl;
     private final String apiKey;
+    private int connectTimeoutMs = 3000;
+    private int readTimeoutMs = 5000;
 
     public LocalAiaClient(String baseUrl, String apiKey) {
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.apiKey = apiKey;
+    }
+
+    public void setTimeouts(int connectTimeoutMs, int readTimeoutMs) {
+        this.connectTimeoutMs = Math.max(500, connectTimeoutMs);
+        this.readTimeoutMs = Math.max(500, readTimeoutMs);
     }
 
     public String getJson(String path) throws IOException {
@@ -40,34 +48,47 @@ public class LocalAiaClient {
     }
 
     public String requestJson(String method, String path, String json) throws IOException {
-        URL url = new URL(baseUrl + path);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        setRequestMethod(conn, method);
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        if (apiKey != null && apiKey.length() > 0) {
-            conn.setRequestProperty("X-API-Key", apiKey);
-        }
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(baseUrl + path);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(connectTimeoutMs);
+            conn.setReadTimeout(readTimeoutMs);
+            setRequestMethod(conn, method);
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            if (apiKey != null && apiKey.length() > 0) {
+                conn.setRequestProperty("X-API-Key", apiKey);
+            }
 
-        if (json != null) {
-            conn.setDoOutput(true);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.getBytes("UTF-8"));
+            if (json != null) {
+                conn.setDoOutput(true);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(json.getBytes("UTF-8"));
+                }
+            }
+
+            int code = conn.getResponseCode();
+            InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+            String body = readBody(stream);
+            if (code < 200 || code >= 300) {
+                throw new IOException("AIA HTTP " + code + " " + method + " " + path + " body=" + body);
+            }
+            return body;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
             }
         }
+    }
 
-        int code = conn.getResponseCode();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(
-                code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream(),
-                "UTF-8"
-        ));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            sb.append(line);
+    public boolean healthCheck() {
+        try {
+            getJson("/health");
+            return true;
+        } catch (Exception ignored) {
+            return false;
         }
-        reader.close();
-        return sb.toString();
     }
 
     public String decide(String json) throws IOException {
@@ -108,6 +129,23 @@ public class LocalAiaClient {
 
     public String deleteRobot(String agentId) throws IOException {
         return deleteJson("/robot/" + encodePathSegment(agentId));
+    }
+
+    private String readBody(InputStream stream) throws IOException {
+        if (stream == null) {
+            return "";
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
+        try {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            return sb.toString();
+        } finally {
+            reader.close();
+        }
     }
 
     private void setRequestMethod(HttpURLConnection conn, String method) throws IOException {
