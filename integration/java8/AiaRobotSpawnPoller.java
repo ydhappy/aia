@@ -47,6 +47,7 @@ public class AiaRobotSpawnPoller {
 
     private List<AiaRobotSpawnRequest> claimPendingRequests() throws Exception {
         List<Long> ids = new ArrayList<Long>();
+        List<Long> claimedIds = new ArrayList<Long>();
         List<AiaRobotSpawnRequest> rows = new ArrayList<AiaRobotSpawnRequest>();
         try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
             conn.setAutoCommit(false);
@@ -71,28 +72,40 @@ public class AiaRobotSpawnPoller {
             );
             for (Long id : ids) {
                 claim.setLong(1, id.longValue());
-                claim.executeUpdate();
+                if (claim.executeUpdate() == 1) {
+                    claimedIds.add(id);
+                }
             }
             claim.close();
             conn.commit();
         }
 
+        for (Long id : claimedIds) {
+            AiaRobotSpawnRequest request = fetchClaimedRequest(id.longValue());
+            if (request != null) {
+                rows.add(request);
+            }
+        }
+        return rows;
+    }
+
+    private AiaRobotSpawnRequest fetchClaimedRequest(long uid) throws Exception {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
             PreparedStatement fetch = conn.prepareStatement(
                     "SELECT * FROM aia_robot_spawn_request "
-                            + "WHERE status = 'claimed' AND server_name = ? "
-                            + "ORDER BY priority DESC, uid ASC LIMIT ?"
+                            + "WHERE uid = ? AND status = 'claimed' AND server_name = ?"
             );
-            fetch.setString(1, serverName);
-            fetch.setInt(2, batchSize);
+            fetch.setLong(1, uid);
+            fetch.setString(2, serverName);
             ResultSet rs = fetch.executeQuery();
-            while (rs.next()) {
-                rows.add(AiaRobotSpawnRequest.from(rs));
+            AiaRobotSpawnRequest request = null;
+            if (rs.next()) {
+                request = AiaRobotSpawnRequest.from(rs);
             }
             rs.close();
             fetch.close();
+            return request;
         }
-        return rows;
     }
 
     private boolean processOne(AiaRobotSpawnRequest request) throws Exception {
@@ -100,14 +113,14 @@ public class AiaRobotSpawnPoller {
             long serverObjectId;
             if (adapter.exists(request)) {
                 serverObjectId = 0L;
+                registerAiaProfileSafely(request);
                 markDone(request.uid, serverObjectId, "already_exists");
-                registerAiaProfile(request);
                 return true;
             }
 
             serverObjectId = adapter.createAndSpawn(request);
             adapter.afterSpawn(request, serverObjectId);
-            registerAiaProfile(request);
+            registerAiaProfileSafely(request);
             markDone(request.uid, serverObjectId, "spawned");
             return true;
         } catch (Exception e) {
@@ -116,9 +129,14 @@ public class AiaRobotSpawnPoller {
         }
     }
 
-    private void registerAiaProfile(AiaRobotSpawnRequest request) throws Exception {
-        if (aiaClient != null) {
+    private void registerAiaProfileSafely(AiaRobotSpawnRequest request) {
+        if (aiaClient == null) {
+            return;
+        }
+        try {
             aiaClient.createRobotProfile(request.toAiaProfileJson());
+        } catch (Exception ignored) {
+            // The game server owns the real robot. AIA profile registration can be retried later.
         }
     }
 
