@@ -14,6 +14,7 @@ from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.shard_balancer_service import shard_balancer_service
 from app.services.server_context_service import server_context_service
+from app.services.spawn_request_dashboard_service import spawn_request_dashboard_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
 
@@ -71,6 +72,16 @@ def robot_ai_dashboard(agent_ids: list[str] = Query(default=[])) -> RobotAiOpsDa
 @router.get("/robot-ai/gui", response_class=HTMLResponse)
 def robot_ai_dashboard_gui(agent_ids: list[str] = Query(default=[])) -> HTMLResponse:
     return HTMLResponse(robot_ai_ops_service.render_dashboard_html(agent_ids))
+
+
+@router.get("/robot-spawn-queue")
+def robot_spawn_queue(limit: int = Query(default=30, ge=1, le=200)) -> dict:
+    return spawn_request_dashboard_service.summary(limit)
+
+
+@router.get("/robot-spawn-queue/gui", response_class=HTMLResponse)
+def robot_spawn_queue_gui(limit: int = Query(default=30, ge=1, le=200)) -> HTMLResponse:
+    return HTMLResponse(spawn_request_dashboard_service.render_html(limit))
 
 
 @router.get("/robot-autonomy-baseline")
