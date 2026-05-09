@@ -8,7 +8,26 @@ GET /health/details
 GET /metrics
 ```
 
-`/health`는 가벼운 생존 확인입니다. `/health/details`는 LLM, state store, DB bridge backend, 선택형 MySQL 연결 상태를 함께 보여줍니다.
+`/health`는 가벼운 생존 확인입니다.
+
+`/health/details`는 LLM, state store, DB bridge backend, 선택형 MySQL 연결 상태, `aia_robot_spawn_request` 테이블 존재 여부를 함께 보여줍니다.
+
+MySQL 상세 응답 예:
+
+```json
+{
+  "mysql": {
+    "enabled": true,
+    "status": "ok",
+    "tables": {
+      "aia_robot_spawn_request": {
+        "exists": true,
+        "required_sql": "sql/aia_robot_spawn_request_mysql55.sql"
+      }
+    }
+  }
+}
+```
 
 ## 판단
 
