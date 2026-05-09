@@ -31,3 +31,19 @@ def test_robot_spawn_request_api_validates_count_limit() -> None:
         json={"server_name": "main", "count": 0},
     )
     assert response.status_code == 422
+
+
+def test_robot_spawn_request_api_validates_level_range() -> None:
+    response = client.post(
+        "/robot/spawn-requests",
+        json={"server_name": "main", "level_min": 30, "level_max": 10},
+    )
+    assert response.status_code == 422
+
+
+def test_robot_spawn_request_api_validates_classes_not_empty() -> None:
+    response = client.post(
+        "/robot/spawn-requests",
+        json={"server_name": "main", "classes": []},
+    )
+    assert response.status_code == 422
