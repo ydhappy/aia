@@ -110,7 +110,7 @@ class DBBridgeService:
             password=parsed.password or "",
             database=(parsed.path or "/aia").lstrip("/"),
             autocommit=True,
-            charset="utf8mb4",
+            charset="utf8",
             cursorclass=pymysql.cursors.DictCursor,
         )
 
