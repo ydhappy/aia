@@ -4,28 +4,56 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
+import java.net.ProtocolException;
 import java.net.URL;
+import java.net.URLEncoder;
 
 public class LocalAiaClient {
     private final String baseUrl;
     private final String apiKey;
 
     public LocalAiaClient(String baseUrl, String apiKey) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = trimTrailingSlash(baseUrl);
         this.apiKey = apiKey;
     }
 
+    public String getJson(String path) throws IOException {
+        return requestJson("GET", path, null);
+    }
+
     public String postJson(String path, String json) throws IOException {
+        return requestJson("POST", path, json);
+    }
+
+    public String putJson(String path, String json) throws IOException {
+        return requestJson("PUT", path, json);
+    }
+
+    public String patchJson(String path, String json) throws IOException {
+        return requestJson("PATCH", path, json);
+    }
+
+    public String deleteJson(String path) throws IOException {
+        return requestJson("DELETE", path, null);
+    }
+
+    public String requestJson(String method, String path, String json) throws IOException {
         URL url = new URL(baseUrl + path);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
+        setRequestMethod(conn, method);
+        conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setRequestProperty("X-API-Key", apiKey);
-        conn.setDoOutput(true);
+        if (apiKey != null && apiKey.length() > 0) {
+            conn.setRequestProperty("X-API-Key", apiKey);
+        }
 
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(json.getBytes("UTF-8"));
+        if (json != null) {
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(json.getBytes("UTF-8"));
+            }
         }
 
         int code = conn.getResponseCode();
@@ -56,5 +84,67 @@ public class LocalAiaClient {
 
     public String feedback(String json) throws IOException {
         return postJson("/robot/feedback", json);
+    }
+
+    public String listRobots() throws IOException {
+        return getJson("/robot");
+    }
+
+    public String createRobotProfile(String json) throws IOException {
+        return postJson("/robot/profile", json);
+    }
+
+    public String replaceRobotProfile(String agentId, String json) throws IOException {
+        return putJson("/robot/" + encodePathSegment(agentId) + "/profile", json);
+    }
+
+    public String patchRobotProfile(String agentId, String json) throws IOException {
+        return patchJson("/robot/" + encodePathSegment(agentId) + "/profile", json);
+    }
+
+    public String getRobot(String agentId) throws IOException {
+        return getJson("/robot/" + encodePathSegment(agentId));
+    }
+
+    public String deleteRobot(String agentId) throws IOException {
+        return deleteJson("/robot/" + encodePathSegment(agentId));
+    }
+
+    private void setRequestMethod(HttpURLConnection conn, String method) throws IOException {
+        try {
+            conn.setRequestMethod(method);
+        } catch (ProtocolException e) {
+            if (!"PATCH".equals(method)) {
+                throw e;
+            }
+            forcePatchMethod(conn, e);
+        }
+    }
+
+    private void forcePatchMethod(HttpURLConnection conn, ProtocolException original) throws IOException {
+        try {
+            Field methodField = HttpURLConnection.class.getDeclaredField("method");
+            methodField.setAccessible(true);
+            methodField.set(conn, "PATCH");
+        } catch (Exception reflectionError) {
+            throw original;
+        }
+    }
+
+    private String encodePathSegment(String value) throws IOException {
+        if (value == null) {
+            return "";
+        }
+        return URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null || value.length() == 0) {
+            return "http://127.0.0.1:8000";
+        }
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
     }
 }
