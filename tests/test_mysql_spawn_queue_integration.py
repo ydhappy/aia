@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app.api.routes_health import health_details
 from app.core.config import settings
 from app.core.mysql import connect_mysql
 from app.models.request_models import RobotSpawnRequestCreateRequest
@@ -15,7 +16,7 @@ MYSQL_DSN = os.environ.get("AIA_TEST_MYSQL_DSN", "")
 
 
 @pytest.mark.skipif(not MYSQL_DSN, reason="AIA_TEST_MYSQL_DSN is not configured")
-def test_mysql_spawn_queue_create_retry_and_recover() -> None:
+def test_mysql_spawn_queue_create_retry_recover_and_health() -> None:
     old_backend = settings.db_bridge_backend
     old_dsn = settings.db_bridge_mysql_dsn
     settings.db_bridge_backend = "mysql"
@@ -29,6 +30,10 @@ def test_mysql_spawn_queue_create_retry_and_recover() -> None:
                 for stmt in [item.strip() for item in sql.split(";") if item.strip() and not item.strip().startswith("-- Example")]:
                     cur.execute(stmt)
                 cur.execute("DELETE FROM aia_robot_spawn_request WHERE request_id LIKE %s", (prefix + "%",))
+
+        health = health_details()
+        assert health["mysql"]["status"] == "ok"
+        assert health["mysql"]["tables"]["aia_robot_spawn_request"]["exists"] is True
 
         create_result = robot_spawn_request_service.create_requests(
             RobotSpawnRequestCreateRequest(
