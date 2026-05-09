@@ -7,6 +7,7 @@ from app.models.request_models import (
     RobotLearningDigestRequest,
     RobotProfilePatchRequest,
     RobotProfileRequest,
+    RobotSpawnRequestCreateRequest,
 )
 from app.models.response_models import (
     AgentTraceResponse,
@@ -22,6 +23,7 @@ from app.models.response_models import (
 from app.services.agent_service import agent_service
 from app.services.learning_service import learning_service
 from app.services.robot_learning_digest_service import robot_learning_digest_service
+from app.services.robot_spawn_request_service import robot_spawn_request_service
 from app.services.store_factory import store
 
 
@@ -39,6 +41,11 @@ def _raise_not_found(agent_id: str) -> None:
 def list_robots() -> RobotListResponse:
     agent_ids = store.list_agent_ids()
     return RobotListResponse(count=len(agent_ids), agent_ids=agent_ids)
+
+
+@router.post("/spawn-requests")
+def create_spawn_requests(request: RobotSpawnRequestCreateRequest) -> dict:
+    return robot_spawn_request_service.create_requests(request)
 
 
 @router.post("/profile", response_model=RobotProfileResponse)
