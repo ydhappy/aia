@@ -15,3 +15,9 @@ def test_health_details_includes_optional_mysql_status() -> None:
     assert "mysql" in data
     assert "enabled" in data["mysql"]
     assert "status" in data["mysql"]
+    assert "tables" in data["mysql"]
+    if data["mysql"].get("enabled"):
+        table = data["mysql"]["tables"].get("aia_robot_spawn_request")
+        assert table is not None
+        assert "exists" in table
+        assert table["required_sql"] == "sql/aia_robot_spawn_request_mysql55.sql"
