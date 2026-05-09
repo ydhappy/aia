@@ -31,9 +31,6 @@ def normalize_env_file() -> None:
     text = ENV_FILE.read_text(encoding="utf-8")
     if "STATE_STORE_MODE=memory" not in text and "STATE_STORE_MODE=" in text:
         text = text.replace("STATE_STORE_MODE=redis", "STATE_STORE_MODE=memory")
-    if "DB_BRIDGE_BACKEND=sqlite" not in text and "DB_BRIDGE_BACKEND=" in text:
-        text = text.replace("DB_BRIDGE_BACKEND=mysql", "DB_BRIDGE_BACKEND=sqlite")
-        text = text.replace("DB_BRIDGE_BACKEND=postgresql", "DB_BRIDGE_BACKEND=sqlite")
     if "ENABLE_API_KEY_AUTH=false" not in text and "ENABLE_API_KEY_AUTH=" in text:
         text = text.replace("ENABLE_API_KEY_AUTH=true", "ENABLE_API_KEY_AUTH=false")
     ENV_FILE.write_text(text, encoding="utf-8")
@@ -58,9 +55,9 @@ def main() -> None:
     print("[bootstrap] completed")
     print(f"[bootstrap] venv: {VENV_DIR}")
     print(f"[bootstrap] env : {ENV_FILE}")
-    print("[bootstrap] safe defaults:")
+    print("[bootstrap] server-integration defaults:")
     print("  STATE_STORE_MODE=memory")
-    print("  DB_BRIDGE_BACKEND=sqlite")
+    print("  DB_BRIDGE_BACKEND=mysql")
     print("  ENABLE_API_KEY_AUTH=false")
     print("[bootstrap] next:")
     print(f"  {py} scripts/run_local_aia.py")
