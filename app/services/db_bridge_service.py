@@ -1,19 +1,14 @@
 import json
 import sqlite3
 from pathlib import Path
-from urllib.parse import urlparse
 
 from app.core.config import settings
+from app.core.mysql import connect_mysql, pymysql
 
 try:
     import psycopg
 except Exception:  # pragma: no cover
     psycopg = None
-
-try:
-    import pymysql
-except Exception:  # pragma: no cover
-    pymysql = None
 
 
 SCHEMA_SQL = """
@@ -168,19 +163,7 @@ class DBBridgeService:
         return psycopg.connect(self.postgres_dsn)
 
     def _mysql_connect(self):
-        if pymysql is None:
-            raise RuntimeError("pymysql_not_installed")
-        parsed = urlparse(self.mysql_dsn.replace("mysql+pymysql://", "mysql://"))
-        return pymysql.connect(
-            host=parsed.hostname or "localhost",
-            port=parsed.port or 3306,
-            user=parsed.username or "root",
-            password=parsed.password or "",
-            database=(parsed.path or "/aia").lstrip("/"),
-            autocommit=True,
-            charset="utf8",
-            cursorclass=pymysql.cursors.DictCursor,
-        )
+        return connect_mysql(self.mysql_dsn)
 
     def _init_sqlite_schema(self) -> None:
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,11 +173,7 @@ class DBBridgeService:
     def _init_postgres_schema(self) -> None:
         if psycopg is None:
             return
-        ddl = (
-            SCHEMA_SQL.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
-            .replace("INTEGER PRIMARY KEY", "BIGSERIAL PRIMARY KEY")
-            .replace("REAL", "DOUBLE PRECISION")
-        )
+        ddl = SCHEMA_SQL.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY").replace("INTEGER PRIMARY KEY", "BIGSERIAL PRIMARY KEY").replace("REAL", "DOUBLE PRECISION")
         with self._pg_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(ddl)
@@ -267,23 +246,11 @@ class DBBridgeService:
 
     def _decision_values(self, rows: list[dict]) -> list[tuple]:
         limited = rows[: self.write_batch_size]
-        return [(
-            row.get("agent_id"),
-            row.get("tick"),
-            row.get("action"),
-            json.dumps(row.get("action_args", {}), ensure_ascii=False),
-            row.get("confidence"),
-            row.get("source"),
-            row.get("reason"),
-        ) for row in limited]
+        return [(row.get("agent_id"), row.get("tick"), row.get("action"), json.dumps(row.get("action_args", {}), ensure_ascii=False), row.get("confidence"), row.get("source"), row.get("reason")) for row in limited]
 
     def _trace_values(self, rows: list[dict]) -> list[tuple]:
         limited = rows[: self.write_batch_size]
-        return [(
-            row.get("agent_id"),
-            row.get("tick"),
-            json.dumps(row.get("trace", {}), ensure_ascii=False),
-        ) for row in limited]
+        return [(row.get("agent_id"), row.get("tick"), json.dumps(row.get("trace", {}), ensure_ascii=False)) for row in limited]
 
     def write_decision(self, decision_row: dict) -> dict:
         return self.write_decisions_batch([decision_row])
