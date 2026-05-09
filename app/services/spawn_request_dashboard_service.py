@@ -88,7 +88,15 @@ class SpawnRequestDashboardService:
         older_than_minutes = max(1, min(int(older_than_minutes or 10), 1440))
         server_name = self._clean_server(server_name)
         if settings.db_bridge_backend.lower() != "mysql":
-            return {"accepted": False, "reason": "db_bridge_backend_not_mysql", "updated": 0}
+            return {
+                "accepted": False,
+                "action": "recover_stale_claimed",
+                "server_name": server_name,
+                "limit": limit,
+                "older_than_minutes": older_than_minutes,
+                "reason": "db_bridge_backend_not_mysql",
+                "updated": 0,
+            }
         cutoff = datetime.now() - timedelta(minutes=older_than_minutes)
         try:
             with self._connect() as conn:
@@ -105,11 +113,20 @@ class SpawnRequestDashboardService:
                 "accepted": True,
                 "action": "recover_stale_claimed",
                 "server_name": server_name,
+                "limit": limit,
                 "older_than_minutes": older_than_minutes,
                 "updated": updated,
             }
         except Exception as exc:
-            return {"accepted": False, "reason": str(exc), "updated": 0}
+            return {
+                "accepted": False,
+                "action": "recover_stale_claimed",
+                "server_name": server_name,
+                "limit": limit,
+                "older_than_minutes": older_than_minutes,
+                "reason": str(exc),
+                "updated": 0,
+            }
 
     def render_html(self, limit: int = 30, status: str | None = None) -> str:
         data = self.summary(limit, status)
@@ -190,7 +207,7 @@ class SpawnRequestDashboardService:
     <tbody>{body_rows}</tbody>
   </table>
   <p class="sub">복구 API: <code>POST /dashboard/robot-spawn-queue/retry-failed</code>, <code>POST /dashboard/robot-spawn-queue/recover-claimed</code></p>
-  <p class="sub">적용: <code>sql/aia_robot_spawn_request_mysql55.sql</code> → <code>scripts/seed_robot_spawn_requests_mysql55.py</code> → 게임서버 <code>AiaRobotSpawnPoller.runOnce()</code></p>
+  <p class="sub">적용: <code>sql/aia_robot_spawn_request_mysql55.sql</code> → <code>POST /robot/spawn-requests</code> → 게임서버 <code>AiaRobotSpawnPoller.runOnce()</code></p>
 </main>
 </body>
 </html>""".format(reason=reason, cards=cards, body_rows=body_rows, status_filter=escape(str(status_filter)))
@@ -199,7 +216,15 @@ class SpawnRequestDashboardService:
         limit = max(1, min(int(limit or 50), 500))
         server_name = self._clean_server(server_name)
         if settings.db_bridge_backend.lower() != "mysql":
-            return {"accepted": False, "reason": "db_bridge_backend_not_mysql", "updated": 0}
+            return {
+                "accepted": False,
+                "action": message,
+                "server_name": server_name,
+                "limit": limit,
+                "from_status": from_status,
+                "reason": "db_bridge_backend_not_mysql",
+                "updated": 0,
+            }
         try:
             with self._connect() as conn:
                 with conn.cursor() as cur:
@@ -214,11 +239,20 @@ class SpawnRequestDashboardService:
                 "accepted": True,
                 "action": message,
                 "server_name": server_name,
+                "limit": limit,
                 "from_status": from_status,
                 "updated": updated,
             }
         except Exception as exc:
-            return {"accepted": False, "reason": str(exc), "updated": 0}
+            return {
+                "accepted": False,
+                "action": message,
+                "server_name": server_name,
+                "limit": limit,
+                "from_status": from_status,
+                "reason": str(exc),
+                "updated": 0,
+            }
 
     def _clean_status(self, status: str | None) -> str | None:
         value = str(status or "").strip().lower()
