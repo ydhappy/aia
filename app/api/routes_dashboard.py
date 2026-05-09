@@ -75,13 +75,40 @@ def robot_ai_dashboard_gui(agent_ids: list[str] = Query(default=[])) -> HTMLResp
 
 
 @router.get("/robot-spawn-queue")
-def robot_spawn_queue(limit: int = Query(default=30, ge=1, le=200)) -> dict:
-    return spawn_request_dashboard_service.summary(limit)
+def robot_spawn_queue(
+    limit: int = Query(default=30, ge=1, le=200),
+    status: str | None = Query(default=None),
+) -> dict:
+    return spawn_request_dashboard_service.summary(limit, status)
 
 
 @router.get("/robot-spawn-queue/gui", response_class=HTMLResponse)
-def robot_spawn_queue_gui(limit: int = Query(default=30, ge=1, le=200)) -> HTMLResponse:
-    return HTMLResponse(spawn_request_dashboard_service.render_html(limit))
+def robot_spawn_queue_gui(
+    limit: int = Query(default=30, ge=1, le=200),
+    status: str | None = Query(default=None),
+) -> HTMLResponse:
+    return HTMLResponse(spawn_request_dashboard_service.render_html(limit, status))
+
+
+@router.post("/robot-spawn-queue/retry-failed")
+def retry_failed_spawn_requests(
+    server_name: str = Query(default="main"),
+    limit: int = Query(default=50, ge=1, le=500),
+) -> dict:
+    return spawn_request_dashboard_service.retry_failed(server_name=server_name, limit=limit)
+
+
+@router.post("/robot-spawn-queue/recover-claimed")
+def recover_claimed_spawn_requests(
+    server_name: str = Query(default="main"),
+    older_than_minutes: int = Query(default=10, ge=1, le=1440),
+    limit: int = Query(default=50, ge=1, le=500),
+) -> dict:
+    return spawn_request_dashboard_service.recover_stale_claimed(
+        server_name=server_name,
+        older_than_minutes=older_than_minutes,
+        limit=limit,
+    )
 
 
 @router.get("/robot-autonomy-baseline")
