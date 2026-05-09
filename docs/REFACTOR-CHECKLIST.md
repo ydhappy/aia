@@ -1,6 +1,6 @@
 # AIA 리팩토링 / 보강 체크리스트
 
-전체 코드, DB, Java 연동, 스크립트, 테스트를 한 번에 크게 바꾸지 않고 파트별로 점검했습니다.
+전체 코드, DB, Java 연동, 실행 코드, 테스트를 한 번에 크게 바꾸지 않고 파트별로 점검했습니다.
 
 ## 진행 원칙
 
@@ -8,6 +8,7 @@
 - 서버 원본 DB 테이블은 직접 수정하지 않는다.
 - MySQL 5.5 호환을 유지한다.
 - Java 8 호환을 유지한다.
+- 순수 코드와 실행 코드를 분리한다.
 - 변경마다 테스트 또는 문서 근거를 남긴다.
 
 ## Part 1. 구조/설정/명백 오류 점검 - 완료
@@ -56,16 +57,18 @@
 - 구형 서버 코드에 붙이기 쉽게 명시 close/rollback 구조로 보강.
 - `DbDecisionPoller`에 JDBC URL charset 보정과 명시 close 추가.
 - `AiaDecisionParser`의 escaped quote / nested object 처리 개선.
-- Java 8 컴파일 게이트는 기존 `integration/java8/*.java` 전체 대상 유지.
 
-## Part 5. 스크립트 / 품질 게이트 - 완료
+## Part 5. 실행 코드 / 품질 게이트 - 완료
 
 - 원클릭 관련 잔여 검색 완료: 남은 참조 없음.
-- `scripts/run_local_aia.py` 기본 포트를 문서/.env 기준인 `8000`으로 통일.
-- `scripts/bootstrap_local.py`가 서버 연동 기본값을 훼손하지 않도록 수정.
-- bootstrap 출력 문구를 서버 연동 기준으로 정리.
-- `ops_tick_smoke.py`에 HTTP/비JSON/서버 미실행 오류 메시지 보강.
-- `robot_crud_smoke.py`에 HTTP/비JSON/서버 미실행 오류 메시지 보강.
+- 실행 코드를 `runners/` 아래로 분리.
+- 서버 실행: `runners/server/run_local_aia.py`.
+- 로컬 준비: `runners/setup/bootstrap_local.py`.
+- Smoke 테스트: `runners/smoke/ops_tick_smoke.py`, `runners/smoke/robot_crud_smoke.py`.
+- DB seed 실행: `runners/db/seed_robot_spawn_requests_mysql55.py`.
+- 품질 게이트: `runners/quality/run_quality_gates.ps1`.
+- 오래된 `scripts/` 실행 파일 삭제.
+- stale `auto_connect_run.py` 삭제.
 - 품질 게이트는 Python compile, 주요 API 테스트, MySQL 5.5 SQL 테스트, 전체 pytest, pip check, Java 8 compile 순서 유지.
 
 ## Part 6. GUI / Dashboard - 완료
@@ -87,7 +90,19 @@
 - README를 최종 API/테스트/유지 문서 기준으로 정리.
 - `docs/USAGE.md`를 최종 Dashboard/테스트 기준으로 정리.
 - `docs/API.md`에 spawn request 응답 필드와 queue 복구 query parameter 반영.
+- `docs/PROJECT-STRUCTURE.md` 추가.
 - 유지 문서 목록 확정.
+
+## 현재 폴더 구조
+
+```text
+app/                 순수 Python 애플리케이션 코드
+sql/                 MySQL 5.5 호환 SQL
+integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
+examples/java8/      Java 8 실행 예제
+runners/             사람이 직접 실행하는 실행 코드
+tests/               pytest 테스트
+```
 
 ## 유지 문서
 
@@ -96,6 +111,7 @@ README.md
 docs/USAGE.md
 docs/SERVER-INTEGRATION.md
 docs/API.md
+docs/PROJECT-STRUCTURE.md
 docs/REFACTOR-CHECKLIST.md
 ```
 
@@ -111,7 +127,7 @@ pytest tests/test_mysql55_schema_compat.py
 Windows 전체 게이트:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
+powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
 
 ## 다음 개선 후보
