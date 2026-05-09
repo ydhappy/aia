@@ -38,6 +38,13 @@ AIA는 아래 역할을 소유합니다.
 4. 서버별 `AiaRobotSpawnAdapter.createAndSpawn()` 안에 기존 `IdFactory`, robot DB insert, inventory/skill 지급, world spawn 로직 연결.
 5. 생성 성공 후 poller가 AIA `/robot/profile`에 자동 등록하고 요청 row를 `done`으로 변경.
 
+운영/복구 API:
+
+- JSON: `GET /dashboard/robot-spawn-queue?status=failed`
+- GUI: `GET /dashboard/robot-spawn-queue/gui?status=failed`
+- 실패 재시도: `POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50`
+- 오래된 claimed 복구: `POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50`
+
 이 방식은 서버에 별도 설정 파일을 만들지 않고, AIA가 생성 계획을 DB 큐로 제공하며, 실제 객체 생성은 게임서버가 담당하게 합니다.
 
 ## Robot CRUD Contract
@@ -80,6 +87,7 @@ UTF-8 / MySQL 5.5 정책:
 
 ```bash
 pytest tests/test_robot_crud_api.py
+pytest tests/test_spawn_request_dashboard.py
 ```
 
 AIA 실행 후 HTTP smoke:
@@ -131,13 +139,16 @@ python scripts/robot_crud_smoke.py
 
 - JSON: `GET /dashboard/robot-ai`
 - GUI: `GET /dashboard/robot-ai/gui`
+- Spawn Queue JSON: `GET /dashboard/robot-spawn-queue`
+- Spawn Queue GUI: `GET /dashboard/robot-spawn-queue/gui`
 
-대시보드는 AIA 의존도, 체크리스트, 품질 게이트, 네비게이션 계약, 학습 이슈 요약을 제공합니다.
+대시보드는 AIA 의존도, 체크리스트, 품질 게이트, 네비게이션 계약, 학습 이슈, spawn queue 처리 상태를 제공합니다.
 
 ## Required Gates
 
 - Python: `python -m compileall -q app scripts integration tests`
 - Robot CRUD API test: `pytest tests/test_robot_crud_api.py`
+- Spawn Queue dashboard test: `pytest tests/test_spawn_request_dashboard.py`
 - Tests: `pytest`
 - Dependencies: `pip check`
 - Java 8 integration sample: `javac -encoding UTF-8 integration/java8/*.java`
