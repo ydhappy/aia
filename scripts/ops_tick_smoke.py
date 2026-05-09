@@ -1,11 +1,38 @@
 import json
 import os
+import sys
+import urllib.error
 import urllib.request
 
 
+BASE_URL = os.environ.get("AIA_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+API_KEY = os.environ.get("API_KEY", "")
+
+
+def post_json(path: str, payload: dict) -> dict:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        BASE_URL + path,
+        data=body,
+        headers={"Content-Type": "application/json; charset=utf-8", "Accept": "application/json"},
+        method="POST",
+    )
+    if API_KEY:
+        request.add_header("X-API-Key", API_KEY)
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw or "{}")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError("HTTP %s %s failed: %s" % (exc.code, path, raw))
+    except urllib.error.URLError as exc:
+        raise RuntimeError("AIA server not reachable at %s: %s" % (BASE_URL, exc))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("AIA returned non-JSON response from %s: %s" % (path, exc))
+
+
 def main() -> None:
-    base_url = os.environ.get("AIA_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-    api_key = os.environ.get("API_KEY", "")
     payload = {
         "profile": {
             "agent_id": "robot_smoke_ops",
@@ -41,17 +68,7 @@ def main() -> None:
         },
         "include_dashboard": True,
     }
-    body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        base_url + "/api/v1/robot/ops-tick",
-        data=body,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
-    )
-    if api_key:
-        request.add_header("X-API-Key", api_key)
-    with urllib.request.urlopen(request, timeout=5) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    data = post_json("/api/v1/robot/ops-tick", payload)
     decision = data.get("decide_result") or {}
     args = decision.get("action_args") or {}
     profile = data.get("autonomy_profile") or {}
@@ -69,4 +86,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print("OPS_TICK_SMOKE_FAILED=%s" % exc, file=sys.stderr)
+        raise
