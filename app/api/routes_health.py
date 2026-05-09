@@ -34,11 +34,29 @@ def health_details() -> dict:
     return {
         "app": settings.app_name,
         "status": "ok",
+        "environment": settings.app_env,
+        "security": _security_health(),
         "llm_backend": settings.llm_backend,
         "llm_status": llm_client.health(),
         "state_store": settings.state_store_mode,
         "db_bridge_backend": settings.db_bridge_backend,
         "mysql": _mysql_health(),
+    }
+
+
+def _security_health() -> dict:
+    warnings: list[str] = []
+    host = str(settings.app_host or "").strip()
+    if not settings.enable_api_key_auth:
+        warnings.append("api_key_auth_disabled")
+    if host in {"0.0.0.0", "::"} and not settings.enable_api_key_auth:
+        warnings.append("public_bind_without_api_key")
+    if settings.enable_api_key_auth and not settings.api_key:
+        warnings.append("api_key_auth_enabled_but_api_key_empty")
+    return {
+        "api_key_auth_enabled": bool(settings.enable_api_key_auth),
+        "bind_host": host,
+        "warnings": warnings,
     }
 
 
