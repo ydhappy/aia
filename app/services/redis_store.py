@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from redis import Redis
 
@@ -22,8 +23,11 @@ class RedisStore:
     def _key(self, prefix: str, agent_id: str) -> str:
         return f"aia:{prefix}:{agent_id}"
 
+    def _json_dumps(self, payload: dict[str, Any]) -> str:
+        return json.dumps(payload, ensure_ascii=False)
+
     def save_state(self, agent_id: str, tick: int, state: dict) -> None:
-        self.client.set(self._key("state", agent_id), json.dumps({"tick": tick, "state": state}))
+        self.client.set(self._key("state", agent_id), self._json_dumps({"tick": tick, "state": state}))
         self._metrics["total_observe_requests"] += 1
 
     def get_state(self, agent_id: str):
@@ -31,16 +35,39 @@ class RedisStore:
         return json.loads(raw) if raw else None
 
     def save_profile(self, agent_id: str, profile: dict) -> None:
-        self.client.set(self._key("profile", agent_id), json.dumps(profile))
+        self.client.set(self._key("profile", agent_id), self._json_dumps(profile))
         self._metrics["total_profiles_saved"] += 1
+
+    def update_profile(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        current = dict(self.get_profile(agent_id) or {"agent_id": agent_id})
+        current.update(patch)
+        current["agent_id"] = agent_id
+        self.save_profile(agent_id, current)
+        return current
 
     def get_profile(self, agent_id: str) -> dict:
         raw = self.client.get(self._key("profile", agent_id))
         return json.loads(raw) if raw else {}
 
+    def has_agent(self, agent_id: str) -> bool:
+        return agent_id in self.list_agent_ids() or agent_id in self.list_learning_ids()
+
+    def delete_agent(self, agent_id: str) -> bool:
+        existed = self.has_agent(agent_id)
+        keys = [
+            self._key("state", agent_id),
+            self._key("profile", agent_id),
+            self._key("events", agent_id),
+            self._key("trace", agent_id),
+            self._key("learning", agent_id),
+        ]
+        if keys:
+            self.client.delete(*keys)
+        return existed
+
     def save_event(self, agent_id: str, event: dict) -> None:
         key = self._key("events", agent_id)
-        self.client.rpush(key, json.dumps(event))
+        self.client.rpush(key, self._json_dumps(event))
         self.client.ltrim(key, -20, -1)
         self._metrics["total_events_saved"] += 1
 
@@ -49,14 +76,14 @@ class RedisStore:
         return [json.loads(row) for row in rows]
 
     def save_trace(self, agent_id: str, trace: dict) -> None:
-        self.client.set(self._key("trace", agent_id), json.dumps(trace))
+        self.client.set(self._key("trace", agent_id), self._json_dumps(trace))
 
     def get_trace(self, agent_id: str) -> dict:
         raw = self.client.get(self._key("trace", agent_id))
         return json.loads(raw) if raw else {}
 
     def save_learning_state(self, agent_id: str, learning_state: dict) -> None:
-        self.client.set(self._key("learning", agent_id), json.dumps(learning_state))
+        self.client.set(self._key("learning", agent_id), self._json_dumps(learning_state))
 
     def get_learning_state(self, agent_id: str) -> dict:
         raw = self.client.get(self._key("learning", agent_id))
