@@ -70,10 +70,6 @@
 
 ## Part 4. Java 8 서버 연동부 - 완료
 
-대상:
-
-- `integration/java8/*.java`
-
 체크 결과:
 
 - `LocalAiaClient`에 connect/read timeout 추가.
@@ -96,7 +92,7 @@
 - `refactor: harden Java8 DB decision poller`
 - `refactor: improve Java8 decision parser escaping`
 
-## Part 5. 스크립트 / 품질 게이트 - 다음 진행 대상
+## Part 5. 스크립트 / 품질 게이트 - 완료
 
 대상:
 
@@ -104,15 +100,24 @@
 - `scripts/*.ps1`
 - `tests/*.py`
 
-체크:
+체크 결과:
 
-- 원클릭 관련 잔여 제거
-- Windows/Linux 실행 명령 정합성
-- smoke script API 경로 정합성
-- pytest coverage 보강
-- 품질 게이트 실패 메시지 개선
+- 원클릭 관련 잔여 검색 완료: 남은 참조 없음.
+- `scripts/run_local_aia.py` 기본 포트를 문서/.env 기준인 `8000`으로 통일.
+- `scripts/bootstrap_local.py`가 서버 연동 기본값을 훼손하지 않도록 수정.
+- bootstrap 출력 문구를 서버 연동 기준으로 정리.
+- `ops_tick_smoke.py`에 HTTP/비JSON/서버 미실행 오류 메시지 보강.
+- `robot_crud_smoke.py`에 HTTP/비JSON/서버 미실행 오류 메시지 보강.
+- 품질 게이트는 Python compile, 주요 API 테스트, MySQL 5.5 SQL 테스트, 전체 pytest, pip check, Java 8 compile 순서 유지.
 
-## Part 6. GUI / Dashboard
+주요 커밋:
+
+- `fix: align local AIA runner default port`
+- `fix: align bootstrap with server integration defaults`
+- `refactor: improve ops tick smoke errors`
+- `refactor: improve robot CRUD smoke errors`
+
+## Part 6. GUI / Dashboard - 다음 진행 대상
 
 대상:
 
