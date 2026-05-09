@@ -52,12 +52,6 @@
 
 ## Part 3. DB / SQL 정합성 - 완료
 
-대상:
-
-- `sql/aia_robot_schema.sql`
-- `sql/aia_robot_spawn_request_mysql55.sql`
-- `app/services/db_bridge_service.py`
-
 체크 결과:
 
 - MySQL 5.5용 bridge 자동 생성 DDL을 명시형 `MYSQL_BRIDGE_SCHEMA_SQL`로 분리.
@@ -74,21 +68,35 @@
 - `test: guard MySQL 5.5 schema compatibility`
 - `test: add MySQL 5.5 schema compatibility gate`
 
-## Part 4. Java 8 서버 연동부 - 다음 진행 대상
+## Part 4. Java 8 서버 연동부 - 완료
 
 대상:
 
 - `integration/java8/*.java`
 
-체크:
+체크 결과:
 
-- Java 8 문법만 사용
-- try-with-resources 사용 가능 범위 확인
-- PATCH fallback 안정성
-- JDBC/MySQL 5.5 호환
-- Adapter 예제와 실제 서버 연결 지점 명확화
+- `LocalAiaClient`에 connect/read timeout 추가.
+- `LocalAiaClient.healthCheck()` 추가.
+- HTTP error stream이 null일 때 NPE가 나지 않도록 처리.
+- HTTP 2xx가 아닌 응답은 body를 포함한 IOException으로 처리.
+- 연결 종료 시 `disconnect()` 호출.
+- `AiaRobotSpawnPoller`에 adapter null 방어 추가.
+- `AiaRobotSpawnPoller`에 MySQL JDBC URL `useUnicode=true&characterEncoding=utf8` 자동 보정 추가.
+- claim transaction 실패 시 rollback 처리 추가.
+- 구형 서버 코드에 붙이기 쉽게 명시 close/rollback 구조로 보강.
+- `DbDecisionPoller`에 JDBC URL charset 보정과 명시 close 추가.
+- `AiaDecisionParser`의 escaped quote / nested object 처리 개선.
+- Java 8 컴파일 게이트는 기존 `integration/java8/*.java` 전체 대상 유지.
 
-## Part 5. 스크립트 / 품질 게이트
+주요 커밋:
+
+- `refactor: harden Java8 local AIA HTTP client`
+- `refactor: harden Java8 spawn poller JDBC handling`
+- `refactor: harden Java8 DB decision poller`
+- `refactor: improve Java8 decision parser escaping`
+
+## Part 5. 스크립트 / 품질 게이트 - 다음 진행 대상
 
 대상:
 
