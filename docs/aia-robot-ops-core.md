@@ -19,6 +19,27 @@ AIA는 아래 역할을 소유합니다.
 - 서버 로봇북/토크 DB가 비어 있어도 AIA 기본 기준으로 사냥터/토크를 생성.
 - 로봇 profile/state/event/trace/learning cache의 AIA 내부 CRUD.
 
+## Robot Spawn Request Bridge
+
+로봇 없는 서버에 바로 붙일 때는 AIA가 서버 원본 `robot` 테이블에 직접 insert하지 않고, 안전한 요청 큐에 생성 요청을 넣습니다.
+
+- DB: `sql/aia_robot_spawn_request_mysql55.sql`
+- AIA seed script: `scripts/seed_robot_spawn_requests_mysql55.py`
+- Java 8 poller: `integration/java8/AiaRobotSpawnPoller.java`
+- Java 8 adapter: `integration/java8/AiaRobotSpawnAdapter.java`
+- Java 8 DTO: `integration/java8/AiaRobotSpawnRequest.java`
+- Example: `integration/java8/AiaRobotSpawnExample.java`
+
+권장 적용 순서:
+
+1. 게임 DB에 `sql/aia_robot_spawn_request_mysql55.sql` 적용.
+2. AIA에서 `scripts/seed_robot_spawn_requests_mysql55.py` 실행해 `pending` 생성 요청 적재.
+3. 게임서버 시작 루틴에서 `AiaRobotSpawnPoller.runOnce()` 호출.
+4. 서버별 `AiaRobotSpawnAdapter.createAndSpawn()` 안에 기존 `IdFactory`, robot DB insert, inventory/skill 지급, world spawn 로직 연결.
+5. 생성 성공 후 poller가 AIA `/robot/profile`에 자동 등록하고 요청 row를 `done`으로 변경.
+
+이 방식은 서버에 별도 설정 파일을 만들지 않고, AIA가 생성 계획을 DB 큐로 제공하며, 실제 객체 생성은 게임서버가 담당하게 합니다.
+
 ## Robot CRUD Contract
 
 AIA의 로봇 CRUD는 게임 서버의 실제 캐릭터 테이블을 직접 수정하지 않습니다. AIA 내부 판단에 필요한 profile, 마지막 state, 최근 event, trace, learning state만 관리합니다.
@@ -128,7 +149,7 @@ python scripts/robot_crud_smoke.py
 
 ## Runtime Adapters
 
-- Python: `examples/python_client.py`, `scripts/ops_tick_smoke.py`, `scripts/robot_crud_smoke.py`
-- Java 8: `integration/java8/LocalAiaClient.java`, `integration/java8/AiaDecisionParser.java`, `integration/java8/RobotCrudExample.java`
+- Python: `examples/python_client.py`, `scripts/ops_tick_smoke.py`, `scripts/robot_crud_smoke.py`, `scripts/seed_robot_spawn_requests_mysql55.py`
+- Java 8: `integration/java8/LocalAiaClient.java`, `integration/java8/AiaDecisionParser.java`, `integration/java8/RobotCrudExample.java`, `integration/java8/AiaRobotSpawnPoller.java`, `integration/java8/AiaRobotSpawnAdapter.java`
 - Jython 2.7: `integration/jython/aia_ops_tick_client.py`
 - Script: `scripts/run_quality_gates.ps1`
