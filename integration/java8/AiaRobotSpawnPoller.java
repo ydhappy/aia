@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +25,10 @@ public class AiaRobotSpawnPoller {
             LocalAiaClient aiaClient,
             AiaRobotSpawnAdapter adapter
     ) {
-        this.jdbcUrl = jdbcUrl;
+        if (adapter == null) {
+            throw new IllegalArgumentException("AiaRobotSpawnAdapter is required");
+        }
+        this.jdbcUrl = normalizeMysqlJdbcUrl(jdbcUrl);
         this.user = user;
         this.password = password;
         this.serverName = serverName == null || serverName.length() == 0 ? "default" : serverName;
@@ -45,39 +49,59 @@ public class AiaRobotSpawnPoller {
         return processed;
     }
 
+    private Connection openConnection() throws SQLException {
+        return DriverManager.getConnection(jdbcUrl, user, password);
+    }
+
     private List<AiaRobotSpawnRequest> claimPendingRequests() throws Exception {
         List<Long> ids = new ArrayList<Long>();
         List<Long> claimedIds = new ArrayList<Long>();
         List<AiaRobotSpawnRequest> rows = new ArrayList<AiaRobotSpawnRequest>();
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
+        Connection conn = null;
+        try {
+            conn = openConnection();
             conn.setAutoCommit(false);
             PreparedStatement select = conn.prepareStatement(
                     "SELECT uid FROM aia_robot_spawn_request "
                             + "WHERE status = 'pending' AND server_name = ? "
                             + "ORDER BY priority DESC, uid ASC LIMIT ?"
             );
-            select.setString(1, serverName);
-            select.setInt(2, batchSize);
-            ResultSet rs = select.executeQuery();
-            while (rs.next()) {
-                ids.add(Long.valueOf(rs.getLong("uid")));
+            try {
+                select.setString(1, serverName);
+                select.setInt(2, batchSize);
+                ResultSet rs = select.executeQuery();
+                try {
+                    while (rs.next()) {
+                        ids.add(Long.valueOf(rs.getLong("uid")));
+                    }
+                } finally {
+                    rs.close();
+                }
+            } finally {
+                select.close();
             }
-            rs.close();
-            select.close();
 
             PreparedStatement claim = conn.prepareStatement(
                     "UPDATE aia_robot_spawn_request "
                             + "SET status = 'claimed', attempts = attempts + 1, claimed_at = NOW() "
                             + "WHERE uid = ? AND status = 'pending'"
             );
-            for (Long id : ids) {
-                claim.setLong(1, id.longValue());
-                if (claim.executeUpdate() == 1) {
-                    claimedIds.add(id);
+            try {
+                for (Long id : ids) {
+                    claim.setLong(1, id.longValue());
+                    if (claim.executeUpdate() == 1) {
+                        claimedIds.add(id);
+                    }
                 }
+            } finally {
+                claim.close();
             }
-            claim.close();
             conn.commit();
+        } catch (Exception e) {
+            rollbackQuietly(conn);
+            throw e;
+        } finally {
+            closeQuietly(conn);
         }
 
         for (Long id : claimedIds) {
@@ -90,21 +114,29 @@ public class AiaRobotSpawnPoller {
     }
 
     private AiaRobotSpawnRequest fetchClaimedRequest(long uid) throws Exception {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
+        Connection conn = openConnection();
+        try {
             PreparedStatement fetch = conn.prepareStatement(
                     "SELECT * FROM aia_robot_spawn_request "
                             + "WHERE uid = ? AND status = 'claimed' AND server_name = ?"
             );
-            fetch.setLong(1, uid);
-            fetch.setString(2, serverName);
-            ResultSet rs = fetch.executeQuery();
-            AiaRobotSpawnRequest request = null;
-            if (rs.next()) {
-                request = AiaRobotSpawnRequest.from(rs);
+            try {
+                fetch.setLong(1, uid);
+                fetch.setString(2, serverName);
+                ResultSet rs = fetch.executeQuery();
+                try {
+                    if (rs.next()) {
+                        return AiaRobotSpawnRequest.from(rs);
+                    }
+                    return null;
+                } finally {
+                    rs.close();
+                }
+            } finally {
+                fetch.close();
             }
-            rs.close();
-            fetch.close();
-            return request;
+        } finally {
+            closeQuietly(conn);
         }
     }
 
@@ -141,16 +173,22 @@ public class AiaRobotSpawnPoller {
     }
 
     private void markDone(long uid, long serverObjectId, String message) throws Exception {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
+        Connection conn = openConnection();
+        try {
             PreparedStatement ps = conn.prepareStatement(
                     "UPDATE aia_robot_spawn_request "
                             + "SET status = 'done', done_at = NOW(), last_error = ? "
                             + "WHERE uid = ?"
             );
-            ps.setString(1, message + ":" + serverObjectId);
-            ps.setLong(2, uid);
-            ps.executeUpdate();
-            ps.close();
+            try {
+                ps.setString(1, message + ":" + serverObjectId);
+                ps.setLong(2, uid);
+                ps.executeUpdate();
+            } finally {
+                ps.close();
+            }
+        } finally {
+            closeQuietly(conn);
         }
     }
 
@@ -159,16 +197,62 @@ public class AiaRobotSpawnPoller {
         if (message.length() > 250) {
             message = message.substring(0, 250);
         }
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password)) {
+        Connection conn = openConnection();
+        try {
             PreparedStatement ps = conn.prepareStatement(
                     "UPDATE aia_robot_spawn_request "
                             + "SET status = 'failed', last_error = ? "
                             + "WHERE uid = ?"
             );
-            ps.setString(1, message);
-            ps.setLong(2, uid);
-            ps.executeUpdate();
-            ps.close();
+            try {
+                ps.setString(1, message);
+                ps.setLong(2, uid);
+                ps.executeUpdate();
+            } finally {
+                ps.close();
+            }
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    private String normalizeMysqlJdbcUrl(String value) {
+        if (value == null) {
+            return "";
+        }
+        String lower = value.toLowerCase();
+        if (!lower.startsWith("jdbc:mysql://")) {
+            return value;
+        }
+        String result = value;
+        if (result.indexOf('?') < 0) {
+            result += "?useUnicode=true&characterEncoding=utf8";
+        } else {
+            if (lower.indexOf("useunicode=") < 0) {
+                result += "&useUnicode=true";
+            }
+            if (lower.indexOf("characterencoding=") < 0) {
+                result += "&characterEncoding=utf8";
+            }
+        }
+        return result;
+    }
+
+    private void rollbackQuietly(Connection conn) {
+        if (conn != null) {
+            try {
+                conn.rollback();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void closeQuietly(Connection conn) {
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 }
