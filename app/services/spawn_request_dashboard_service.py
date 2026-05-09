@@ -181,7 +181,7 @@ class SpawnRequestDashboardService:
     .card {{ background:#182630; border:1px solid #2c4654; border-radius:14px; padding:16px; }}
     .card b {{ display:block; margin-top:6px; font-size:28px; }}
     .actions {{ display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 24px; }}
-    .actions form {{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#14222b; border:1px solid #2c4654; border-radius:14px; padding:10px; }}
+    .actions .box {{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#14222b; border:1px solid #2c4654; border-radius:14px; padding:10px; }}
     input {{ background:#0a1117; color:#eef6f7; border:1px solid #385868; border-radius:8px; padding:7px; width:76px; }}
     table {{ width:100%; border-collapse:collapse; background:#14222b; border-radius:12px; overflow:hidden; }}
     th,td {{ border-bottom:1px solid #2c4654; padding:9px; text-align:left; vertical-align:top; font-size:13px; }}
@@ -215,12 +215,12 @@ class SpawnRequestDashboardService:
   <p class="sub">{operator_hint}</p>
   <section class="cards">{cards}</section>
   <section class="actions">
-    <form method="post" action="/dashboard/robot-spawn-queue/retry-failed">
-      <b>failed 재시도</b><label>server <input name="server_name" value="main"></label><label>limit <input name="limit" value="50"></label><button type="submit">retry</button>
-    </form>
-    <form method="post" action="/dashboard/robot-spawn-queue/recover-claimed">
-      <b>claimed 복구</b><label>server <input name="server_name" value="main"></label><label>min <input name="older_than_minutes" value="10"></label><label>limit <input name="limit" value="50"></label><button type="submit">recover</button>
-    </form>
+    <div class="box">
+      <b>failed 재시도</b><label>server <input id="retryServer" value="main"></label><label>limit <input id="retryLimit" value="50"></label><button type="button" onclick="postAction('/dashboard/robot-spawn-queue/retry-failed','retryServer','retryLimit')">retry</button>
+    </div>
+    <div class="box">
+      <b>claimed 복구</b><label>server <input id="recoverServer" value="main"></label><label>min <input id="recoverMinutes" value="10"></label><label>limit <input id="recoverLimit" value="50"></label><button type="button" onclick="recoverClaimed()">recover</button>
+    </div>
   </section>
   <table>
     <thead><tr><th>uid</th><th>request</th><th>server</th><th>agent</th><th>name</th><th>class</th><th>level</th><th>x/y/map</th><th>priority</th><th>status</th><th>try</th><th>created</th><th>message</th></tr></thead>
@@ -228,6 +228,19 @@ class SpawnRequestDashboardService:
   </table>
   <p class="sub">적용: <code>sql/aia_robot_spawn_request_mysql55.sql</code> → <code>POST /robot/spawn-requests</code> → 게임서버 <code>AiaRobotSpawnPoller.runOnce()</code></p>
 </main>
+<script>
+function enc(id) {{ return encodeURIComponent(document.getElementById(id).value || ''); }}
+function postAction(path, serverId, limitId) {{
+  fetch(path + '?server_name=' + enc(serverId) + '&limit=' + enc(limitId), {{ method:'POST' }})
+    .then(r => r.json()).then(j => {{ alert(JSON.stringify(j)); location.reload(); }})
+    .catch(e => alert('request failed: ' + e));
+}}
+function recoverClaimed() {{
+  fetch('/dashboard/robot-spawn-queue/recover-claimed?server_name=' + enc('recoverServer') + '&older_than_minutes=' + enc('recoverMinutes') + '&limit=' + enc('recoverLimit'), {{ method:'POST' }})
+    .then(r => r.json()).then(j => {{ alert(JSON.stringify(j)); location.reload(); }})
+    .catch(e => alert('request failed: ' + e));
+}}
+</script>
 </body>
 </html>""".format(
             banner_class=banner_class,
