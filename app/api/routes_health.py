@@ -6,6 +6,8 @@ from app.models.response_models import HealthResponse
 from app.services.llm_client import llm_client
 
 
+SPAWN_QUEUE_TABLE = "aia_robot_spawn_request"
+
 router = APIRouter(tags=["health"])
 
 
@@ -22,7 +24,7 @@ def health() -> HealthResponse:
 
 @router.get("/health/details")
 def health_details() -> dict:
-    details = {
+    return {
         "app": settings.app_name,
         "status": "ok",
         "llm_backend": settings.llm_backend,
@@ -31,7 +33,6 @@ def health_details() -> dict:
         "db_bridge_backend": settings.db_bridge_backend,
         "mysql": _mysql_health(),
     }
-    return details
 
 
 def _mysql_health() -> dict:
@@ -40,19 +41,34 @@ def _mysql_health() -> dict:
             "enabled": False,
             "status": "skipped",
             "reason": "db_bridge_backend_not_mysql",
+            "tables": {},
         }
     try:
         with connect_mysql(settings.db_bridge_mysql_dsn) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1 AS ok")
                 row = cur.fetchone() or {}
+                cur.execute("SHOW TABLES LIKE %s", (SPAWN_QUEUE_TABLE,))
+                spawn_queue_row = cur.fetchone()
         return {
             "enabled": True,
             "status": "ok" if int(row.get("ok", 0)) == 1 else "unknown",
+            "tables": {
+                SPAWN_QUEUE_TABLE: {
+                    "exists": spawn_queue_row is not None,
+                    "required_sql": "sql/aia_robot_spawn_request_mysql55.sql",
+                }
+            },
         }
     except Exception as exc:
         return {
             "enabled": True,
             "status": "error",
             "reason": str(exc),
+            "tables": {
+                SPAWN_QUEUE_TABLE: {
+                    "exists": False,
+                    "required_sql": "sql/aia_robot_spawn_request_mysql55.sql",
+                }
+            },
         }
