@@ -21,6 +21,7 @@ def compile_python() -> None:
 
 def run_pytest() -> None:
     focused = [
+        "tests/test_mysql_helper.py",
         "tests/test_robot_crud_api.py",
         "tests/test_robot_spawn_request_api.py",
         "tests/test_spawn_request_dashboard.py",
