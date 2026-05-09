@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AgentState(BaseModel):
@@ -88,19 +88,29 @@ class RobotProfilePatchRequest(BaseModel):
 
 
 class RobotSpawnRequestCreateRequest(BaseModel):
-    server_name: str = "main"
+    server_name: str = Field(default="main", min_length=1, max_length=64)
     count: int = Field(default=30, ge=1, le=500)
-    request_prefix: str = "aia-api"
-    agent_prefix: str = "aia_robot"
-    name_prefix: str = "AIA로봇"
-    classes: list[str] = Field(default_factory=lambda: ["knight", "elf", "wizard"])
-    level_min: int = Field(default=1, ge=1)
-    level_max: int = Field(default=30, ge=1)
+    request_prefix: str = Field(default="aia-api", min_length=1, max_length=32)
+    agent_prefix: str = Field(default="aia_robot", min_length=1, max_length=32)
+    name_prefix: str = Field(default="AIA로봇", min_length=1, max_length=30)
+    classes: list[str] = Field(default_factory=lambda: ["knight", "elf", "wizard"], min_length=1, max_length=16)
+    level_min: int = Field(default=1, ge=1, le=99)
+    level_max: int = Field(default=30, ge=1, le=99)
     priority: int = Field(default=100, ge=0, le=10000)
     default_x: int = 32670
     default_y: int = 32790
-    default_map: int = 4
+    default_map: int = Field(default=4, ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_spawn_ranges(self) -> "RobotSpawnRequestCreateRequest":
+        if self.level_min > self.level_max:
+            raise ValueError("level_min_must_be_less_than_or_equal_to_level_max")
+        cleaned = [str(item).strip() for item in self.classes if str(item).strip()]
+        if not cleaned:
+            raise ValueError("classes_must_not_be_empty")
+        self.classes = cleaned
+        return self
 
 
 class RobotEventRequest(BaseModel):
