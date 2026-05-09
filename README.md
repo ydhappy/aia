@@ -101,15 +101,11 @@ Windows 전체 게이트:
 powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
 ```
 
-## 문서
-
-현재 유지 문서:
+## 유지 문서
 
 ```text
 README.md
-_docs/QUICKSTART.md
-_docs/SERVER-INTEGRATION.md
-_docs/API.md
+docs/QUICKSTART.md
+docs/SERVER-INTEGRATION.md
+docs/API.md
 ```
-
-실제 경로는 `docs/`입니다. 오래된 세부 문서는 정리 대상입니다.
