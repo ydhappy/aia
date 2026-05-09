@@ -303,7 +303,10 @@ DELETE /robot/{agent_id}
 ```http
 GET /dashboard/robot-ai/gui
 GET /dashboard/robot-spawn-queue/gui
+GET /dashboard/robot-spawn-queue/gui?status=failed
 ```
+
+Spawn Queue GUI는 `total`, `needs_attention`, `pending/claimed/done/failed` 카드, failed 재시도, claimed 복구 버튼을 제공합니다.
 
 ## 16. 테스트
 
@@ -311,6 +314,7 @@ GET /dashboard/robot-spawn-queue/gui
 pytest tests/test_robot_crud_api.py
 pytest tests/test_robot_spawn_request_api.py
 pytest tests/test_spawn_request_dashboard.py
+pytest tests/test_mysql55_schema_compat.py
 ```
 
 Windows 전체 점검:
