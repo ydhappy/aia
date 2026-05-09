@@ -61,8 +61,12 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 - growth stage / anomaly / meta policy 반영
 - AIA 네비게이션 응답에 `points`, `route_id`, `spread_radius`, `server_validation` 포함
 
-### 로봇 지식 / 학습 / 성장
+### 로봇 지식 / CRUD / 학습 / 성장
+- `GET /robot`
 - `POST /robot/profile`
+- `PUT /robot/{agent_id}/profile`
+- `PATCH /robot/{agent_id}/profile`
+- `DELETE /robot/{agent_id}`
 - `POST /robot/event`
 - `POST /robot/feedback`
 - `GET /robot/{agent_id}`
@@ -113,6 +117,7 @@ AIA는 다음 문제를 해결하기 위한 계층입니다.
 게임서버는 센서 전송과 최종 실행 검증만 유지하고, AIA가 정책 판단, 네비게이션 전략, 학습/성장, 토크, 운영 체크리스트를 담당합니다.
 
 다른 서버는 우선 `POST /api/v1/robot/ops-tick` 하나만 붙여도 profile, event, observe, decide, feedback, dashboard 요약을 한 번에 연동할 수 있습니다.
+로봇 생성/수정/삭제는 `GET /robot`, `POST /robot/profile`, `PUT/PATCH /robot/{agent_id}/profile`, `DELETE /robot/{agent_id}`를 사용합니다.
 연동 샘플은 Python, Java 8, Jython 2.7, PowerShell 품질 게이트 스크립트 형태로 제공합니다.
 
 ---
@@ -198,6 +203,7 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 ### 권장 방식
 - 상태 / 이벤트 / 피드백 / 장기 이력 → DB
 - 즉시 판단 / 긴급 전술 판단 → 로컬 HTTP
+- 로봇 생성 / 수정 / 삭제 → `/robot` CRUD API
 
 즉, **DB + HTTP 혼합형**이 기본 권장안입니다.
 
@@ -222,6 +228,9 @@ Windows라면 가상환경 Python 경로만 맞춰서 실행하면 됩니다.
 
 ### DB schema 안내
 - `scripts/init_db_schema.py`
+
+### Robot CRUD API 테스트
+- `pytest tests/test_robot_crud_api.py`
 
 ---
 
@@ -253,8 +262,12 @@ DB_BRIDGE_MYSQL_DSN=mysql+pymysql://user:password@127.0.0.1:3306/your_database
 - `POST /api/v1/robot/sync`
 - `POST /api/v1/robot/ops-tick`
 
-### 로봇 데이터
+### 로봇 데이터 / CRUD
+- `GET /robot`
 - `POST /robot/profile`
+- `PUT /robot/{agent_id}/profile`
+- `PATCH /robot/{agent_id}/profile`
+- `DELETE /robot/{agent_id}`
 - `POST /robot/event`
 - `POST /robot/feedback`
 - `GET /robot/{agent_id}`
@@ -368,6 +381,7 @@ AIA의 기본 운영 경로는 다음입니다.
 
 현재 저장소는 다음을 포함합니다.
 - 운영형 로봇 AI 백엔드
+- 로봇 CRUD API
 - DB bridge
 - growth / anomaly / meta policy
 - fully integrated automation
