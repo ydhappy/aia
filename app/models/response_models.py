@@ -59,6 +59,18 @@ class RobotKnowledgeResponse(BaseModel):
     last_state: dict[str, Any] | None = None
 
 
+class RobotListResponse(BaseModel):
+    count: int = 0
+    agent_ids: list[str] = Field(default_factory=list)
+
+
+class RobotDeleteResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    deleted: bool
+    message: str = "robot data deleted"
+
+
 class AgentTraceResponse(BaseModel):
     agent_id: str
     trace: dict[str, Any] = Field(default_factory=dict)
