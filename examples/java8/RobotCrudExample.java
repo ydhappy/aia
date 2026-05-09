@@ -1,4 +1,6 @@
-package integration.java8;
+package examples.java8;
+
+import integration.java8.LocalAiaClient;
 
 public class RobotCrudExample {
     public static void main(String[] args) throws Exception {
