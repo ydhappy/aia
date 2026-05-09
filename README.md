@@ -80,6 +80,8 @@ POST /robot/spawn-requests
 POST /robot/profile
 GET  /dashboard/robot-ai/gui
 GET  /dashboard/robot-spawn-queue/gui
+POST /dashboard/robot-spawn-queue/retry-failed
+POST /dashboard/robot-spawn-queue/recover-claimed
 ```
 
 전체 API 요약:
@@ -94,6 +96,7 @@ docs/API.md
 pytest tests/test_robot_crud_api.py
 pytest tests/test_robot_spawn_request_api.py
 pytest tests/test_spawn_request_dashboard.py
+pytest tests/test_mysql55_schema_compat.py
 ```
 
 Windows 전체 게이트:
@@ -109,4 +112,5 @@ README.md
 docs/USAGE.md
 docs/SERVER-INTEGRATION.md
 docs/API.md
+docs/REFACTOR-CHECKLIST.md
 ```
