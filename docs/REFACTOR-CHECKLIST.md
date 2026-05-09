@@ -10,7 +10,7 @@
 - Java 8 호환을 유지한다.
 - 변경마다 테스트 또는 문서 근거를 남긴다.
 
-## Part 1. 구조/설정/명백 오류 점검
+## Part 1. 구조/설정/명백 오류 점검 - 진행 완료
 
 대상:
 
@@ -21,15 +21,26 @@
 - `.env.example`
 - `requirements.txt`
 
-체크:
+체크 결과:
 
-- 라우트 등록 누락 여부
-- import 순환 가능성
-- API 경로 충돌 여부
-- 설정 기본값과 문서 불일치 여부
-- 테스트에서 깨질 수 있는 기본 상태 확인
+- 라우트 등록 상태 확인.
+- `/robot/spawn-requests`가 `/robot/{agent_id}`보다 앞에 있어 경로 충돌 없음.
+- `.env.example`을 서버 연동 기본값으로 정리.
+- `STATE_STORE_MODE=memory` 기본 적용.
+- `ENABLE_API_KEY_AUTH=false` 기본 적용.
+- MySQL 5.5 예시 DSN 반영.
+- spawn request validation 보강.
+- `level_min > level_max` 차단.
+- 빈 `classes` 차단.
+- 관련 테스트 보강.
 
-## Part 2. Robot CRUD / Spawn Request 안정화
+주요 커밋:
+
+- `chore: align env example with server integration defaults`
+- `fix: validate robot spawn request ranges`
+- `test: cover robot spawn request validation`
+
+## Part 2. Robot CRUD / Spawn Request 안정화 - 다음 진행 대상
 
 대상:
 
