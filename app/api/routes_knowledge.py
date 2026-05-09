@@ -1,15 +1,22 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import verify_api_key
-from app.models.request_models import RobotEventRequest, RobotFeedbackRequest, RobotProfileRequest
-from app.models.request_models import RobotLearningDigestRequest
+from app.models.request_models import (
+    RobotEventRequest,
+    RobotFeedbackRequest,
+    RobotLearningDigestRequest,
+    RobotProfilePatchRequest,
+    RobotProfileRequest,
+)
 from app.models.response_models import (
     AgentTraceResponse,
+    RobotDeleteResponse,
     RobotEventResponse,
     RobotFeedbackResponse,
     RobotKnowledgeResponse,
     RobotLearningDigestResponse,
     RobotLearningStateResponse,
+    RobotListResponse,
     RobotProfileResponse,
 )
 from app.services.agent_service import agent_service
@@ -21,10 +28,48 @@ from app.services.store_factory import store
 router = APIRouter(prefix="/robot", tags=["robot"], dependencies=[Depends(verify_api_key)])
 
 
+def _raise_not_found(agent_id: str) -> None:
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "robot_not_found", "agent_id": agent_id},
+    )
+
+
+@router.get("", response_model=RobotListResponse)
+def list_robots() -> RobotListResponse:
+    agent_ids = store.list_agent_ids()
+    return RobotListResponse(count=len(agent_ids), agent_ids=agent_ids)
+
+
 @router.post("/profile", response_model=RobotProfileResponse)
 def save_profile(request: RobotProfileRequest) -> RobotProfileResponse:
     store.save_profile(request.agent_id, request.model_dump())
     return RobotProfileResponse(agent_id=request.agent_id)
+
+
+@router.put("/{agent_id}/profile", response_model=RobotProfileResponse)
+def replace_profile(agent_id: str, request: RobotProfileRequest) -> RobotProfileResponse:
+    profile = request.model_dump()
+    profile["agent_id"] = agent_id
+    store.save_profile(agent_id, profile)
+    return RobotProfileResponse(agent_id=agent_id, message="robot profile replaced")
+
+
+@router.patch("/{agent_id}/profile", response_model=RobotProfileResponse)
+def patch_profile(agent_id: str, request: RobotProfilePatchRequest) -> RobotProfileResponse:
+    if not store.has_agent(agent_id):
+        _raise_not_found(agent_id)
+    patch = request.model_dump(exclude_unset=True)
+    store.update_profile(agent_id, patch)
+    return RobotProfileResponse(agent_id=agent_id, message="robot profile updated")
+
+
+@router.delete("/{agent_id}", response_model=RobotDeleteResponse)
+def delete_robot(agent_id: str) -> RobotDeleteResponse:
+    deleted = store.delete_agent(agent_id)
+    if not deleted:
+        _raise_not_found(agent_id)
+    return RobotDeleteResponse(agent_id=agent_id, deleted=True)
 
 
 @router.post("/event", response_model=RobotEventResponse)
@@ -50,6 +95,8 @@ def learning_summary() -> dict:
 
 @router.get("/{agent_id}", response_model=RobotKnowledgeResponse)
 def get_robot_knowledge(agent_id: str) -> RobotKnowledgeResponse:
+    if not store.has_agent(agent_id):
+        _raise_not_found(agent_id)
     return RobotKnowledgeResponse(
         agent_id=agent_id,
         profile=store.get_profile(agent_id),
@@ -60,9 +107,13 @@ def get_robot_knowledge(agent_id: str) -> RobotKnowledgeResponse:
 
 @router.get("/{agent_id}/trace", response_model=AgentTraceResponse)
 def get_agent_trace(agent_id: str) -> AgentTraceResponse:
+    if not store.has_agent(agent_id):
+        _raise_not_found(agent_id)
     return agent_service.get_trace(agent_id)
 
 
 @router.get("/{agent_id}/learning", response_model=RobotLearningStateResponse)
 def get_learning_state(agent_id: str) -> RobotLearningStateResponse:
+    if not store.has_agent(agent_id):
+        _raise_not_found(agent_id)
     return learning_service.get_learning_state(agent_id)
