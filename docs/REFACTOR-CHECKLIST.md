@@ -10,16 +10,7 @@
 - Java 8 호환을 유지한다.
 - 변경마다 테스트 또는 문서 근거를 남긴다.
 
-## Part 1. 구조/설정/명백 오류 점검 - 진행 완료
-
-대상:
-
-- `app/main.py`
-- `app/api/*.py`
-- `app/core/*.py`
-- `app/services/store_factory.py`
-- `.env.example`
-- `requirements.txt`
+## Part 1. 구조/설정/명백 오류 점검 - 완료
 
 체크 결과:
 
@@ -40,7 +31,7 @@
 - `fix: validate robot spawn request ranges`
 - `test: cover robot spawn request validation`
 
-## Part 2. Robot CRUD / Spawn Request 안정화 - 다음 진행 대상
+## Part 2. Robot CRUD / Spawn Request 안정화 - 완료
 
 대상:
 
@@ -50,15 +41,24 @@
 - `app/services/robot_spawn_request_service.py`
 - `app/services/spawn_request_dashboard_service.py`
 
-체크:
+체크 결과:
 
-- `/robot/{agent_id}`와 고정 경로 충돌 여부
-- 요청 validation 강화
-- MySQL 미사용 환경 fallback
-- 중복 request 처리 정책
-- failed/recover 처리 안전성
+- `/robot/{agent_id}`와 고정 경로 충돌 없음.
+- spawn request 생성 응답에 `submitted`, `affected`, `duplicate_policy`, `required_table` 추가.
+- MySQL 미사용 fallback 응답에 `required_table` 포함.
+- class 값 정규화 보강.
+- 중복 request 처리 정책을 응답에 명시.
+- failed retry / stale claimed recovery 응답을 표준화.
+- recovery 응답에 `action`, `server_name`, `limit`, `updated` 일관 적용.
+- 관련 테스트 보강.
 
-## Part 3. DB / SQL 정합성
+주요 커밋:
+
+- `refactor: clarify spawn request creation response`
+- `refactor: standardize spawn queue recovery responses`
+- `test: assert standardized spawn queue recovery response`
+
+## Part 3. DB / SQL 정합성 - 다음 진행 대상
 
 대상:
 
