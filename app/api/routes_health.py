@@ -7,6 +7,13 @@ from app.services.llm_client import llm_client
 
 
 SPAWN_QUEUE_TABLE = "aia_robot_spawn_request"
+DB_BRIDGE_TABLES = [
+    "aia_robot_state",
+    "aia_robot_event",
+    "aia_robot_feedback",
+    "aia_robot_decision",
+    "aia_robot_trace_summary",
+]
 
 router = APIRouter(tags=["health"])
 
@@ -48,27 +55,47 @@ def _mysql_health() -> dict:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1 AS ok")
                 row = cur.fetchone() or {}
-                cur.execute("SHOW TABLES LIKE %s", (SPAWN_QUEUE_TABLE,))
-                spawn_queue_row = cur.fetchone()
+                tables = _mysql_table_status(cur)
+        missing_tables = [name for name, info in tables.items() if not info.get("exists")]
         return {
             "enabled": True,
             "status": "ok" if int(row.get("ok", 0)) == 1 else "unknown",
-            "tables": {
-                SPAWN_QUEUE_TABLE: {
-                    "exists": spawn_queue_row is not None,
-                    "required_sql": "sql/aia_robot_spawn_request_mysql55.sql",
-                }
-            },
+            "missing_tables": missing_tables,
+            "tables": tables,
         }
     except Exception as exc:
         return {
             "enabled": True,
             "status": "error",
             "reason": str(exc),
-            "tables": {
-                SPAWN_QUEUE_TABLE: {
-                    "exists": False,
-                    "required_sql": "sql/aia_robot_spawn_request_mysql55.sql",
-                }
-            },
+            "missing_tables": [SPAWN_QUEUE_TABLE] + DB_BRIDGE_TABLES,
+            "tables": _fallback_table_status(False),
         }
+
+
+def _mysql_table_status(cur) -> dict:
+    tables: dict[str, dict] = {}
+    for table_name, required_sql in _required_tables().items():
+        cur.execute("SHOW TABLES LIKE %s", (table_name,))
+        tables[table_name] = {
+            "exists": cur.fetchone() is not None,
+            "required_sql": required_sql,
+        }
+    return tables
+
+
+def _fallback_table_status(exists: bool) -> dict:
+    return {
+        table_name: {
+            "exists": exists,
+            "required_sql": required_sql,
+        }
+        for table_name, required_sql in _required_tables().items()
+    }
+
+
+def _required_tables() -> dict[str, str]:
+    result = {SPAWN_QUEUE_TABLE: "sql/aia_robot_spawn_request_mysql55.sql"}
+    for table_name in DB_BRIDGE_TABLES:
+        result[table_name] = "sql/aia_robot_schema.sql"
+    return result
