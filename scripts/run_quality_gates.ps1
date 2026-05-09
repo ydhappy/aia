@@ -23,6 +23,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Output "ROBOT_CRUD_PYTEST_EXIT=0"
 
+& $Python -m pytest tests/test_robot_spawn_request_api.py
+if ($LASTEXITCODE -ne 0) {
+    throw "robot spawn request API pytest failed: $LASTEXITCODE"
+}
+Write-Output "ROBOT_SPAWN_REQUEST_API_PYTEST_EXIT=0"
+
 & $Python -m pytest tests/test_spawn_request_dashboard.py
 if ($LASTEXITCODE -ne 0) {
     throw "spawn request dashboard pytest failed: $LASTEXITCODE"
