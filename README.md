@@ -5,6 +5,23 @@ AIA는 게임서버 옆에서 실행되는 **Python 기반 로봇 AI 브리지**
 
 원클릭 실행 방식은 제거했습니다. 서버 연동 기준으로 직접 설치, DB 적용, AIA 실행, 게임서버 poller 연결 순서로 사용합니다.
 
+## 폴더 구조
+
+```text
+app/                 순수 Python 애플리케이션 코드
+sql/                 MySQL 5.5 호환 SQL
+integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
+examples/java8/      Java 8 main 예제
+runners/             사람이 직접 실행하는 실행 코드
+tests/               pytest 테스트
+```
+
+상세 구조:
+
+```text
+docs/PROJECT-STRUCTURE.md
+```
+
 ## 기본 사용 순서
 
 1. Python 가상환경 생성 및 의존성 설치.
@@ -22,22 +39,25 @@ AIA는 게임서버 옆에서 실행되는 **Python 기반 로봇 AI 브리지**
 docs/USAGE.md
 ```
 
-## 핵심 구조
+## 실행
 
-```text
-Game Server
-  - objectId 발급
-  - robot/character DB insert
-  - world spawn
-  - 이동/공격/스킬 실행
-  - 최종 검증
+설치/준비:
 
-AIA
-  - 로봇 생성 요청 큐
-  - /robot profile 관리
-  - observe/decide/ops-tick 판단
-  - feedback/learning
-  - dashboard/gui
+```bash
+python runners/setup/bootstrap_local.py
+```
+
+AIA 실행:
+
+```bash
+python runners/server/run_local_aia.py
+```
+
+Smoke 테스트:
+
+```bash
+python runners/smoke/ops_tick_smoke.py
+python runners/smoke/robot_crud_smoke.py
 ```
 
 ## 로봇 없는 서버 연동 요약
@@ -102,7 +122,7 @@ pytest tests/test_mysql55_schema_compat.py
 Windows 전체 게이트:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/run_quality_gates.ps1
+powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
 
 ## 유지 문서
@@ -112,5 +132,6 @@ README.md
 docs/USAGE.md
 docs/SERVER-INTEGRATION.md
 docs/API.md
+docs/PROJECT-STRUCTURE.md
 docs/REFACTOR-CHECKLIST.md
 ```
