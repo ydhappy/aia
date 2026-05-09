@@ -51,11 +51,11 @@ public class AiaDecisionParser {
         if (firstQuote < 0) {
             return defaultValue;
         }
-        int secondQuote = json.indexOf('"', firstQuote + 1);
+        int secondQuote = findStringEnd(json, firstQuote + 1);
         if (secondQuote < 0) {
             return defaultValue;
         }
-        return json.substring(firstQuote + 1, secondQuote);
+        return unescapeJsonString(json.substring(firstQuote + 1, secondQuote));
     }
 
     private double readDouble(String json, String key, double defaultValue) {
@@ -101,8 +101,24 @@ public class AiaDecisionParser {
             return defaultValue;
         }
         int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
         for (int i = braceStart; i < json.length(); i++) {
             char c = json.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+                continue;
+            }
             if (c == '{') {
                 depth++;
             }
@@ -114,5 +130,28 @@ public class AiaDecisionParser {
             }
         }
         return defaultValue;
+    }
+
+    private int findStringEnd(String json, int from) {
+        boolean escaped = false;
+        for (int i = from; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private String unescapeJsonString(String value) {
+        return value.replace("\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t")
+                .replace("\\\\", "\\");
     }
 }
