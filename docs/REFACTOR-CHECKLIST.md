@@ -33,14 +33,6 @@
 
 ## Part 2. Robot CRUD / Spawn Request 안정화 - 완료
 
-대상:
-
-- `app/api/routes_knowledge.py`
-- `app/models/request_models.py`
-- `app/models/response_models.py`
-- `app/services/robot_spawn_request_service.py`
-- `app/services/spawn_request_dashboard_service.py`
-
 체크 결과:
 
 - `/robot/{agent_id}`와 고정 경로 충돌 없음.
@@ -58,7 +50,7 @@
 - `refactor: standardize spawn queue recovery responses`
 - `test: assert standardized spawn queue recovery response`
 
-## Part 3. DB / SQL 정합성 - 다음 진행 대상
+## Part 3. DB / SQL 정합성 - 완료
 
 대상:
 
@@ -66,15 +58,23 @@
 - `sql/aia_robot_spawn_request_mysql55.sql`
 - `app/services/db_bridge_service.py`
 
-체크:
+체크 결과:
 
-- MySQL 5.5 비호환 문법 제거
-- charset `utf8` 유지
-- JSON column/generation 미사용 확인
-- index/unique key 중복 확인
-- AIA-owned table과 server-owned table 경계 명확화
+- MySQL 5.5용 bridge 자동 생성 DDL을 명시형 `MYSQL_BRIDGE_SCHEMA_SQL`로 분리.
+- SQLite용 `TEXT NOT NULL DEFAULT ''` 변환 방식 제거.
+- MySQL 5.5에서 깨질 수 있는 `TEXT/LONGTEXT DEFAULT` 방지.
+- `ENGINE=InnoDB DEFAULT CHARSET=utf8` 유지.
+- JSON column / generated column 미사용 테스트 추가.
+- spawn request SQL도 MySQL 5.5 호환 테스트 추가.
+- 품질 게이트에 `tests/test_mysql55_schema_compat.py` 추가.
 
-## Part 4. Java 8 서버 연동부
+주요 커밋:
+
+- `fix: use explicit MySQL 5.5 bridge schema`
+- `test: guard MySQL 5.5 schema compatibility`
+- `test: add MySQL 5.5 schema compatibility gate`
+
+## Part 4. Java 8 서버 연동부 - 다음 진행 대상
 
 대상:
 
