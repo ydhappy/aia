@@ -23,7 +23,7 @@ from app.models.response_models import (
 from app.services.agent_service import agent_service
 from app.services.learning_service import learning_service
 from app.services.robot_learning_digest_service import robot_learning_digest_service
-from app.services.robot_spawn_request_service import robot_spawn_request_service
+from app.services.spawn import robot_spawn_request_service
 from app.services.store_factory import store
 
 
