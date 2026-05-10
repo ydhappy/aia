@@ -30,9 +30,9 @@ AIA
 4. AIA 실행
 5. POST /robot/spawn-requests로 생성 요청 적재
 6. 기존 게임서버에 integration/java8 파일 복사
-7. 기존 서버 시작 루틴에 AiaRobotSpawnPoller 연결
+7. 기존 서버 시작 루틴에 AiaServerConnector 연결
 8. 기존 서버 코드에 MyServerAiaRobotAdapter 구현
-9. 기존 로봇 AI tick 또는 NPC/robot update loop에서 ops-tick 호출
+9. 기존 로봇 AI tick 또는 NPC/robot update loop에서 connector.opsTick() 호출
 10. dashboard로 pending/failed/done 상태 확인
 ```
 
@@ -72,10 +72,12 @@ ENABLE_API_KEY_AUTH=true
 API_KEY=충분히_긴_랜덤_키
 ```
 
-Java 쪽 `LocalAiaClient`에도 같은 API key를 넣습니다.
+Java 쪽 `AiaServerConfig`에도 같은 API key를 넣습니다.
 
 ```java
-LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "충분히_긴_랜덤_키");
+new AiaServerConfig()
+    .setAiaBaseUrl("http://127.0.0.1:8000")
+    .setApiKey("충분히_긴_랜덤_키");
 ```
 
 ## 5. MySQL 5.5 SQL 적용
@@ -141,10 +143,10 @@ POST /robot/spawn-requests
 }
 ```
 
-`server_name`은 Java poller의 `serverName`과 반드시 같아야 합니다.
+`server_name`은 Java connector 설정의 `serverName`과 반드시 같아야 합니다.
 
 ```java
-new AiaRobotSpawnPoller(..., "main", aia, adapter)
+new AiaServerConfig().setServerName("main");
 ```
 
 ## 8. 기존 게임서버에 복사할 Java 파일
@@ -153,6 +155,8 @@ new AiaRobotSpawnPoller(..., "main", aia, adapter)
 
 ```text
 integration/java8/LocalAiaClient.java
+integration/java8/AiaServerConfig.java
+integration/java8/AiaServerConnector.java
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
@@ -176,7 +180,7 @@ server/src/l1j/server/aia/
 
 ## 9. 기존 서버 시작 루틴에 넣는 위치
 
-AIA spawn poller는 서버가 DB와 월드 기본 로딩을 끝낸 뒤 실행해야 합니다.
+AIA spawn connector는 서버가 DB와 월드 기본 로딩을 끝낸 뒤 실행해야 합니다.
 
 권장 위치:
 
@@ -190,7 +194,7 @@ GameServer.start()
   -> ItemTable.load()
   -> SkillTable.load()
   -> World 초기화
-  -> AIA 로봇 생성 poller 실행
+  -> AIA connector bootSpawnOnce 실행
   -> acceptor/listener open
   -> game loop start
 ```
@@ -223,37 +227,40 @@ server/src/.../aia/MyServerAiaBootstrap.java
 예시:
 
 ```java
-import integration.java8.AiaRobotSpawnAdapter;
-import integration.java8.AiaRobotSpawnPoller;
-import integration.java8.LocalAiaClient;
+import integration.java8.AiaServerConfig;
+import integration.java8.AiaServerConnector;
 
 public final class MyServerAiaBootstrap {
+    private static AiaServerConnector connector;
+
     private MyServerAiaBootstrap() {
     }
 
     public static void bootOnce() {
         try {
-            LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "");
-            aia.setTimeouts(3000, 5000);
+            AiaServerConfig config = new AiaServerConfig()
+                    .setAiaBaseUrl("http://127.0.0.1:8000")
+                    .setApiKey("")
+                    .setJdbcUrl("jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8")
+                    .setDbUser("root")
+                    .setDbPassword("password")
+                    .setServerName("main")
+                    .setSpawnBatchSize(20)
+                    .setConnectTimeoutMs(3000)
+                    .setReadTimeoutMs(5000)
+                    .setHealthCheckBeforeSpawn(true);
 
-            AiaRobotSpawnAdapter adapter = new MyServerAiaRobotAdapter();
-
-            AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
-                "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
-                "root",
-                "password",
-                "main",
-                aia,
-                adapter
-            );
-
-            poller.setBatchSize(20);
-            int created = poller.runOnce();
-            System.out.println("[AIA] spawned or processed robots=" + created);
+            connector = new AiaServerConnector(config, new MyServerAiaRobotAdapter());
+            int processed = connector.bootSpawnOnce();
+            System.out.println("[AIA] spawned or processed robots=" + processed);
         } catch (Exception e) {
             System.out.println("[AIA] boot failed: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public static AiaServerConnector getConnector() {
+        return connector;
     }
 }
 ```
@@ -346,12 +353,10 @@ public boolean exists(AiaRobotSpawnRequest request) throws Exception {
         return true;
     }
 
-    // 서버에 캐릭터 이름 중복 검사 함수가 있는 경우
     if (CharacterTable.getInstance().doesCharNameExist(request.name)) {
         return true;
     }
 
-    // 서버에 로봇 테이블이 있는 경우
     if (RobotTable.getInstance().findByAgentId(request.agentId) != null) {
         return true;
     }
@@ -578,7 +583,7 @@ GeneralThreadPool scheduled task
 ```text
 1. 서버 로봇 객체 상태 수집
 2. AIA ops-tick JSON 생성
-3. LocalAiaClient.opsTick(json) 호출
+3. MyServerAiaBootstrap.getConnector().opsTick(json) 호출
 4. AiaDecisionParser로 action 파싱
 5. 서버 자체 검증
 6. 기존 move/attack/skill 함수 호출
@@ -589,9 +594,14 @@ GeneralThreadPool scheduled task
 ```java
 public void onRobotAiTick(L1RobotInstance robot) {
     try {
-        LocalAiaClient aia = AiaClientHolder.get();
+        AiaServerConnector connector = MyServerAiaBootstrap.getConnector();
+        if (connector == null) {
+            robot.doIdle();
+            return;
+        }
+
         String json = buildOpsTickJson(robot);
-        String response = aia.opsTick(json);
+        String response = connector.opsTick(json);
         AiaDecision decision = AiaDecisionParser.parse(response);
 
         if (!isDecisionAllowed(robot, decision)) {
@@ -600,7 +610,6 @@ public void onRobotAiTick(L1RobotInstance robot) {
 
         executeDecision(robot, decision);
     } catch (Exception e) {
-        // AIA 장애 시 기존 AI fallback 또는 idle
         robot.doIdle();
     }
 }
@@ -761,8 +770,8 @@ python -m pytest tests/test_mysql_spawn_queue_integration.py
 확인:
 
 ```text
-server_name이 AIA 요청과 Java poller에서 같은가?
-AiaRobotSpawnPoller.runOnce()가 호출되는가?
+server_name이 AIA 요청과 Java connector에서 같은가?
+AiaServerConnector.bootSpawnOnce()가 호출되는가?
 DB 계정이 aia_robot_spawn_request update 권한을 갖는가?
 ```
 
@@ -800,7 +809,7 @@ AI scheduler 등록 실패
 ```text
 AI scheduler 등록 여부
 tick loop 실행 여부
-ops-tick 호출 여부
+connector.opsTick() 호출 여부
 AIA 응답 action 파싱 여부
 서버 최종 검증에서 막히는지 여부
 ```
