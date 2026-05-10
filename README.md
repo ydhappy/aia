@@ -116,7 +116,30 @@ POST /robot/spawn-requests
 }
 ```
 
-### 6. 기존 게임서버에 붙일 Java 파일
+### 6. Java 외부 설정 파일 준비
+
+기존 게임서버의 설정 폴더에 예시 파일을 복사합니다.
+
+```text
+integration/java8/aia-server.properties.example -> config/aia-server.properties
+```
+
+수정할 값:
+
+```properties
+aia.baseUrl=http://127.0.0.1:8000
+aia.apiKey=
+aia.jdbcUrl=jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8
+aia.dbUser=root
+aia.dbPassword=password
+aia.serverName=main
+aia.spawnBatchSize=20
+aia.healthCheckBeforeSpawn=true
+aia.connectTimeoutMs=3000
+aia.readTimeoutMs=5000
+```
+
+### 7. 기존 게임서버에 붙일 Java 파일
 
 아래 파일을 기존 게임서버 소스에 복사합니다.
 
@@ -124,6 +147,7 @@ POST /robot/spawn-requests
 integration/java8/LocalAiaClient.java
 integration/java8/AiaServerConfig.java
 integration/java8/AiaServerConnector.java
+integration/java8/aia-server.properties.example
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
@@ -131,22 +155,16 @@ integration/java8/AiaDecisionParser.java
 integration/java8/DbDecisionPoller.java
 ```
 
-권장 연결 방식은 `AiaServerConnector`입니다.
+권장 연결 방식은 `AiaServerConnector.fromFile()`입니다.
 
 ```java
 private static AiaServerConnector aiaConnector;
 
 private void bootAiaRobots() throws Exception {
-    AiaServerConfig config = new AiaServerConfig()
-        .setAiaBaseUrl("http://127.0.0.1:8000")
-        .setApiKey("")
-        .setJdbcUrl("jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8")
-        .setDbUser("root")
-        .setDbPassword("password")
-        .setServerName("main")
-        .setSpawnBatchSize(20);
-
-    aiaConnector = new AiaServerConnector(config, new MyServerAiaRobotAdapter());
+    aiaConnector = AiaServerConnector.fromFile(
+        "config/aia-server.properties",
+        new MyServerAiaRobotAdapter()
+    );
     int processed = aiaConnector.bootSpawnOnce();
     System.out.println("[AIA] spawn processed=" + processed);
 }
