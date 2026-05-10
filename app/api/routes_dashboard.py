@@ -12,8 +12,8 @@ from app.services.dashboard_service import dashboard_service
 from app.services.rebalance_service import rebalance_service
 from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
-from app.services.shard_balancer_service import shard_balancer_service
 from app.services.server_context_service import server_context_service
+from app.services.shard_balancer_service import shard_balancer_service
 from app.services.spawn_request_dashboard_service import spawn_request_dashboard_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
@@ -46,10 +46,7 @@ def shard_assign_weighted(agent_ids: list[str], shard_count: int = 1) -> list[di
 def shard_rebalance(agent_ids: list[str], shard_count: int = 1) -> dict:
     shards = shard_balancer_service.weighted_assign(agent_ids, shard_count)
     recommendation = rebalance_service.recommend(shards)
-    return {
-        "shards": shards,
-        "recommendation": recommendation,
-    }
+    return {"shards": shards, "recommendation": recommendation}
 
 
 @router.get("/world-profile/{world_id}")
@@ -78,16 +75,18 @@ def robot_ai_dashboard_gui(agent_ids: list[str] = Query(default=[])) -> HTMLResp
 def robot_spawn_queue(
     limit: int = Query(default=30, ge=1, le=200),
     status: str | None = Query(default=None),
+    server_name: str | None = Query(default=None),
 ) -> dict:
-    return spawn_request_dashboard_service.summary(limit, status)
+    return spawn_request_dashboard_service.summary(limit, status, server_name)
 
 
 @router.get("/robot-spawn-queue/gui", response_class=HTMLResponse)
 def robot_spawn_queue_gui(
     limit: int = Query(default=30, ge=1, le=200),
     status: str | None = Query(default=None),
+    server_name: str | None = Query(default=None),
 ) -> HTMLResponse:
-    return HTMLResponse(spawn_request_dashboard_service.render_html(limit, status))
+    return HTMLResponse(spawn_request_dashboard_service.render_html(limit, status, server_name))
 
 
 @router.post("/robot-spawn-queue/retry-failed")
@@ -104,11 +103,7 @@ def recover_claimed_spawn_requests(
     older_than_minutes: int = Query(default=10, ge=1, le=1440),
     limit: int = Query(default=50, ge=1, le=500),
 ) -> dict:
-    return spawn_request_dashboard_service.recover_stale_claimed(
-        server_name=server_name,
-        older_than_minutes=older_than_minutes,
-        limit=limit,
-    )
+    return spawn_request_dashboard_service.recover_stale_claimed(server_name=server_name, older_than_minutes=older_than_minutes, limit=limit)
 
 
 @router.get("/robot-autonomy-baseline")
@@ -119,16 +114,9 @@ def robot_autonomy_baseline() -> dict:
 @router.post("/robot-autonomy-baseline")
 def save_robot_autonomy_baseline(config: dict) -> dict:
     saved = robot_autonomy_baseline_service.save_operator_config(config)
-    return {
-        "accepted": True,
-        "config_path": str(robot_autonomy_baseline_service.config_path),
-        "config": saved,
-    }
+    return {"accepted": True, "config_path": str(robot_autonomy_baseline_service.config_path), "config": saved}
 
 
 @router.post("/robot-autonomy-baseline/reload")
 def reload_robot_autonomy_baseline() -> dict:
-    return {
-        "accepted": True,
-        "baseline": robot_autonomy_baseline_service.load(force=True),
-    }
+    return {"accepted": True, "baseline": robot_autonomy_baseline_service.load(force=True)}
