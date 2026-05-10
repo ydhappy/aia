@@ -6,7 +6,7 @@ import time
 from app.core.config import settings
 from app.core.mysql import connect_mysql
 from app.core.names import ClassId, SpawnStatus, Table
-from app.models.request_models import RobotSpawnRequestCreateRequest
+from app.models.req import RobotSpawnRequestCreateRequest
 from app.services.autonomy import robot_autonomy_baseline_service
 
 
