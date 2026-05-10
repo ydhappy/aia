@@ -5,16 +5,9 @@ import time
 
 from app.core.config import settings
 from app.core.mysql import connect_mysql
+from app.core.names import ClassId, SpawnStatus, Table
 from app.models.request_models import RobotSpawnRequestCreateRequest
 from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
-
-
-CLASS_IDS = {
-    "royal": 0,
-    "knight": 1,
-    "elf": 2,
-    "wizard": 3,
-}
 
 
 class RobotSpawnRequestService:
@@ -26,7 +19,7 @@ class RobotSpawnRequestService:
             return {
                 "accepted": False,
                 "reason": "db_bridge_backend_not_mysql",
-                "required_table": "aia_robot_spawn_request",
+                "required_table": Table.SPAWN,
                 "created": 0,
                 "submitted": 0,
                 "affected": 0,
@@ -59,14 +52,14 @@ class RobotSpawnRequestService:
                 "submitted": len(submitted_rows),
                 "affected": affected,
                 "duplicate_policy": "same request_id is updated; failed rows are reset to pending",
-                "required_table": "aia_robot_spawn_request",
+                "required_table": Table.SPAWN,
                 "requests": [self._public_row(row) for row in submitted_rows],
             }
         except Exception as exc:
             return {
                 "accepted": False,
                 "reason": str(exc),
-                "required_table": "aia_robot_spawn_request",
+                "required_table": Table.SPAWN,
                 "created": len(submitted_rows),
                 "submitted": len(submitted_rows),
                 "affected": affected,
@@ -85,7 +78,7 @@ class RobotSpawnRequestService:
 
     def _build_row(self, request: RobotSpawnRequestCreateRequest, index: int, zone: dict, class_type: str) -> dict:
         profile = self._class_profile(class_type)
-        class_id = CLASS_IDS.get(class_type, 1)
+        class_id = ClassId.BY_NAME.get(class_type, ClassId.KNIGHT)
         agent_id = "%s_%04d" % (self._safe_token(request.agent_prefix), index)
         request_id = "%s-%s" % (self._safe_token(request.request_prefix), agent_id)
         name = "%s%04d" % (request.name_prefix[:30], index)
@@ -158,7 +151,7 @@ class RobotSpawnRequestService:
             "loc_x": row["loc_x"],
             "loc_y": row["loc_y"],
             "loc_map": row["loc_map"],
-            "status": "pending",
+            "status": SpawnStatus.PENDING,
         }
 
     def _safe_class(self, value: str) -> str:
