@@ -1,17 +1,33 @@
 # AIA
 
 AIA는 게임서버 옆에서 실행되는 **Python 기반 로봇 AI 브리지**입니다.
-게임서버는 실제 로봇 객체 생성, 이동, 공격, 스킬, 월드 등록을 담당하고 AIA는 판단, 프로필, 학습, 생성 요청 큐, 대시보드를 담당합니다.
 
-원클릭 실행 방식은 제거했습니다. 서버 연동 기준으로 직접 설치, DB 적용, AIA 실행, 게임서버 poller 연결 순서로 사용합니다.
+게임서버는 실제 로봇 객체 생성, DB insert, 월드 등록, 이동, 공격, 스킬 실행을 담당합니다. AIA는 로봇 생성 요청 큐, 판단 API, 프로필, 학습, 대시보드를 담당합니다.
+
+원클릭 실행 방식과 예제/샘플 전용 코드는 제거했습니다. 현재 기준은 **서버 연동용 코드와 운영 문서만 유지**하는 구조입니다.
+
+## 핵심 구조
+
+```text
+AIA HTTP API
+  -> MySQL 5.5 spawn queue
+  -> Java 8 AiaRobotSpawnPoller
+  -> 게임서버 AiaRobotSpawnAdapter 구현
+  -> 서버 IdFactory / DB insert / World spawn / AI scheduler
+```
+
+AIA는 서버 원본 `robot`, `characters`, `robot_setting` 테이블을 직접 수정하지 않습니다.
 
 ## 폴더 구조
 
 ```text
-app/                 순수 Python 애플리케이션 코드
+app/                 Python 애플리케이션 코드
+app/core/            설정, 보안, 공통 상수, live JSON loader
+app/models/          짧은 모델 파일(req/res/dash/uni/auto/batch)
+app/services/        서비스 로직(spawn/spawn_dash/autonomy 등)
+app/ui/              HTML UI 렌더러
 sql/                 MySQL 5.5 호환 SQL
 integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
-examples/java8/      Java 8 main 예제
 runners/             사람이 직접 실행하는 실행 코드
 tests/               pytest 테스트
 ```
@@ -20,6 +36,22 @@ tests/               pytest 테스트
 
 ```text
 docs/PROJECT-STRUCTURE.md
+```
+
+## 공식 짧은 파일명
+
+```text
+app/models/req.py       요청 모델
+app/models/res.py       응답 모델
+app/models/dash.py      Dashboard 모델
+app/models/uni.py       통합 API 모델
+app/models/auto.py      Automation 모델
+app/models/batch.py     Batch 모델
+
+app/services/spawn.py       로봇 생성 요청 서비스
+app/services/spawn_dash.py  Spawn Queue 대시보드 서비스
+app/services/autonomy.py    자율운영 설정/프로필 서비스
+app/ui/spawn_queue.py       Spawn Queue GUI
 ```
 
 ## 기본 사용 순서
@@ -31,7 +63,7 @@ docs/PROJECT-STRUCTURE.md
 5. `POST /robot/spawn-requests`로 로봇 생성 요청 생성.
 6. 게임서버 Java 8 `AiaRobotSpawnPoller`와 `AiaRobotSpawnAdapter` 연결.
 7. `/api/v1/robot/ops-tick`으로 판단 루프 연동.
-8. `/dashboard/robot-spawn-queue/gui`와 `/dashboard/robot-ai/gui`로 운영 확인.
+8. `/dashboard/robot-spawn-queue/gui?server_name=main`과 `/dashboard/robot-ai/gui`로 운영 확인.
 
 자세한 사용방법:
 
@@ -60,30 +92,29 @@ python runners/smoke/ops_tick_smoke.py
 python runners/smoke/robot_crud_smoke.py
 ```
 
-## 로봇 없는 서버 연동 요약
-
-1. 게임 DB에 MySQL 5.5용 큐 테이블 적용.
+## DB 적용
 
 ```bash
+mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 ```
 
-2. AIA에서 로봇 생성 요청 생성.
+적용 후 확인:
 
 ```http
-POST /robot/spawn-requests
+GET /health/details
 ```
 
-3. 게임서버 Java 8 시작 루틴에 poller 연결.
+`mysql.missing_tables`가 빈 배열이어야 합니다.
 
-```text
-integration/java8/AiaRobotSpawnPoller.java
-integration/java8/AiaRobotSpawnAdapter.java
-```
+## 로봇 없는 서버 연동 요약
 
-4. 서버별 `createAndSpawn()`에 기존 서버의 `IdFactory`, DB insert, world spawn 로직을 연결합니다.
+1. 게임 DB에 MySQL 5.5용 SQL을 적용합니다.
+2. AIA에서 로봇 생성 요청을 생성합니다.
+3. 게임서버 Java 8 시작 루틴에 poller를 연결합니다.
+4. 서버별 Adapter의 `createAndSpawn()`에 기존 서버의 `IdFactory`, DB insert, world spawn, AI scheduler 로직을 연결합니다.
 
-상세 문서:
+서버 연동 문서:
 
 ```text
 docs/SERVER-INTEGRATION.md
@@ -93,15 +124,16 @@ docs/SERVER-INTEGRATION.md
 
 ```http
 GET  /health
+GET  /health/details
 GET  /metrics
 POST /api/v1/robot/ops-tick
 GET  /robot
 POST /robot/spawn-requests
 POST /robot/profile
 GET  /dashboard/robot-ai/gui
-GET  /dashboard/robot-spawn-queue/gui
-POST /dashboard/robot-spawn-queue/retry-failed
-POST /dashboard/robot-spawn-queue/recover-claimed
+GET  /dashboard/robot-spawn-queue/gui?server_name=main
+POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
+POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
 
 전체 API 요약:
@@ -112,25 +144,21 @@ docs/API.md
 
 ## 테스트
 
-개별 테스트:
-
-```bash
-pytest tests/test_robot_crud_api.py
-pytest tests/test_robot_spawn_request_api.py
-pytest tests/test_spawn_request_dashboard.py
-pytest tests/test_mysql55_schema_compat.py
-```
-
-Linux/GitHub Actions용 전체 게이트:
+권장 전체 점검:
 
 ```bash
 python runners/quality/run_quality_gates.py
 ```
 
-Windows 전체 게이트:
+주요 개별 테스트:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
+```bash
+pytest tests/test_mods.py
+pytest tests/test_auto_live.py
+pytest tests/test_spawn_api.py
+pytest tests/test_spawn_dash.py
+pytest tests/test_spawn_ui.py
+pytest tests/test_mysql55.py
 ```
 
 선택형 MySQL 통합 테스트:
@@ -140,13 +168,11 @@ AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
 python -m pytest tests/test_mysql_spawn_queue_integration.py
 ```
 
-GitHub Actions:
+Windows 전체 게이트:
 
-```text
-.github/workflows/aia-ci.yml
+```powershell
+powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
-
-push, pull request, 수동 실행 시 기본 품질 게이트와 MariaDB 기반 spawn queue 통합 테스트를 실행합니다.
 
 ## 유지 문서
 
@@ -157,4 +183,5 @@ docs/SERVER-INTEGRATION.md
 docs/API.md
 docs/PROJECT-STRUCTURE.md
 docs/REFACTOR-CHECKLIST.md
+docs/THIRD-PARTY-REVIEW.md
 ```
