@@ -1,6 +1,6 @@
 from app.core.config import settings
 from app.graphs.agent_graph import agent_graph
-from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
+from app.models.batch import BatchDecideResponse, BatchObserveResponse
 from app.models.req import DecideRequest, ObserveRequest
 from app.models.res import AgentTraceResponse, DecideResponse, ObserveResponse
 from app.services.anomaly_detection_service import anomaly_detection_service
