@@ -4,10 +4,8 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.core.mysql import connect_mysql
-from app.services.spawn_request_dashboard_renderer import STATUS_ORDER, render_spawn_queue_html
-
-
-VALID_STATUSES = {"pending", "claimed", "done", "failed"}
+from app.core.names import SpawnStatus
+from app.ui.spawn_queue import render_spawn_queue
 
 
 class SpawnRequestDashboardService:
@@ -63,7 +61,7 @@ class SpawnRequestDashboardService:
                     cur.execute(base_sql + " ORDER BY uid DESC LIMIT %s", tuple(params))
                     rows = list(cur.fetchall())
             total = sum(counts.values())
-            needs_attention = counts.get("failed", 0) + counts.get("claimed", 0)
+            needs_attention = counts.get(SpawnStatus.FAILED, 0) + counts.get(SpawnStatus.CLAIMED, 0)
             return {
                 "enabled": True,
                 "reason": "",
@@ -90,7 +88,7 @@ class SpawnRequestDashboardService:
             }
 
     def retry_failed(self, server_name: str = "main", limit: int = 50) -> dict:
-        return self._reset_status("failed", "retry_failed", server_name, limit)
+        return self._reset_status(SpawnStatus.FAILED, "retry_failed", server_name, limit)
 
     def recover_stale_claimed(self, server_name: str = "main", older_than_minutes: int = 10, limit: int = 50) -> dict:
         limit = max(1, min(int(limit or 50), 500))
@@ -138,7 +136,7 @@ class SpawnRequestDashboardService:
             }
 
     def render_html(self, limit: int = 30, status: str | None = None, server_name: str | None = None) -> str:
-        return render_spawn_queue_html(self.summary(limit, status, server_name))
+        return render_spawn_queue(self.summary(limit, status, server_name))
 
     def _reset_status(self, from_status: str, message: str, server_name: str, limit: int) -> dict:
         limit = max(1, min(int(limit or 50), 500))
@@ -183,11 +181,11 @@ class SpawnRequestDashboardService:
             }
 
     def _empty_counts(self) -> dict[str, int]:
-        return {status: 0 for status in STATUS_ORDER}
+        return {status: 0 for status in SpawnStatus.ALL}
 
     def _clean_status(self, status: str | None) -> str | None:
         value = str(status or "").strip().lower()
-        return value if value in VALID_STATUSES else None
+        return value if value in SpawnStatus.SET else None
 
     def _clean_optional_server(self, server_name: str | None) -> str | None:
         value = str(server_name or "").strip()
