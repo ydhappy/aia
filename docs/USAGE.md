@@ -2,6 +2,8 @@
 
 이 문서는 기존 Java 게임서버에 AIA를 붙이는 실제 작업 순서를 설명합니다. 핵심은 AIA가 서버 DB에 직접 로봇을 insert하지 않고, 기존 게임서버가 `AiaRobotSpawnAdapter`와 `AiaRobotActionAdapter`를 구현하여 자기 방식대로 로봇을 생성하고 실행하게 하는 것입니다.
 
+초보자는 `docs/BEGINNER-SETUP.md`를 먼저 그대로 따라가면 됩니다.
+
 ## 1. 전체 구조
 
 ```text
@@ -28,8 +30,8 @@ AIA
 2. .env 설정
 3. MySQL 5.5 SQL 적용
 4. 서버에 로봇 테이블이 없다면 sql/robot_min_mysql55.sql 적용
-5. AIA 실행
-6. POST /robot/spawn-requests로 생성 요청 적재
+5. 초보자 테스트용 sql/robot_seed_mysql55.sql 적용
+6. AIA 실행
 7. 기존 게임서버에 integration/java8 파일 복사
 8. aia-server.properties와 aia-robot-template.properties를 서버 config에 복사 후 수정
 9. 기존 서버 시작 루틴에 AiaServerConnector.fromFile() 연결
@@ -90,6 +92,12 @@ mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
 ```
 
+초보자 테스트용 기본 생성요청:
+
+```bash
+mysql -u root -p your_game_db < sql/robot_seed_mysql55.sql
+```
+
 생성되는 최소 로봇 테이블:
 
 ```text
@@ -98,6 +106,23 @@ robot_item
 robot_skill
 robot_ai
 robot_log
+```
+
+기본 seed는 `robot`에 직접 넣지 않고 `aia_robot_spawn_request`에 `pending` 요청을 넣습니다.
+
+확인:
+
+```sql
+SELECT uid, request_id, server_name, agent_id, name, class_type, level, status
+FROM aia_robot_spawn_request
+WHERE request_id LIKE 'seed-main-%'
+ORDER BY uid;
+```
+
+## 6. AIA 실행
+
+```bash
+python runners/server/run_local_aia.py
 ```
 
 확인:
@@ -113,13 +138,9 @@ mysql.status = ok
 mysql.missing_tables = []
 ```
 
-## 6. AIA 실행
-
-```bash
-python runners/server/run_local_aia.py
-```
-
 ## 7. 로봇 생성 요청 넣기
+
+seed를 쓰지 않고 API로 직접 생성요청을 넣을 수도 있습니다.
 
 ```http
 POST /robot/spawn-requests
@@ -196,6 +217,16 @@ aia.class.knight=1
 aia.class.elf=2
 aia.class.wizard=3
 aia.class.default=1
+
+aia.hp.default=100
+aia.hp.knight=160
+aia.hp.elf=120
+aia.hp.wizard=80
+
+aia.mp.default=30
+aia.mp.knight=20
+aia.mp.elf=60
+aia.mp.wizard=120
 
 aia.item.default=40010,40011
 aia.item.knight=1,23,40010,40011
@@ -385,7 +416,44 @@ if (runner != null) {
 }
 ```
 
-## 16. 실패/복구 확인
+## 16. 실행 후 DB 확인
+
+생성 요청 상태:
+
+```sql
+SELECT request_id, name, class_type, status, attempts, last_error
+FROM aia_robot_spawn_request
+WHERE request_id LIKE 'seed-main-%'
+ORDER BY uid;
+```
+
+로봇 생성:
+
+```sql
+SELECT robot_uid, object_id, agent_id, name, class_type, level, loc_x, loc_y, loc_map
+FROM robot
+ORDER BY robot_uid;
+```
+
+아이템:
+
+```sql
+SELECT r.name, i.item_id, i.count
+FROM robot r
+JOIN robot_item i ON r.robot_uid = i.robot_uid
+ORDER BY r.robot_uid, i.item_id;
+```
+
+스킬:
+
+```sql
+SELECT r.name, s.skill_id, s.skill_level
+FROM robot r
+JOIN robot_skill s ON r.robot_uid = s.robot_uid
+ORDER BY r.robot_uid, s.skill_id;
+```
+
+## 17. 실패/복구 확인
 
 ```http
 GET /dashboard/robot-spawn-queue/gui?server_name=main
@@ -394,7 +462,7 @@ POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
 POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
 
-## 17. 운영 설정 실시간 반영
+## 18. 운영 설정 실시간 반영
 
 아래 JSON은 AIA 재시작 없이 다음 요청에서 자동 반영됩니다.
 
@@ -409,7 +477,7 @@ app/config/aia_robot_top_profile.json
 GET /dashboard/robot-autonomy-baseline
 ```
 
-## 18. 테스트
+## 19. 테스트
 
 ```bash
 python runners/quality/run_quality_gates.py
@@ -426,7 +494,7 @@ pytest tests/test_spawn_ui.py
 pytest tests/test_mysql55.py
 ```
 
-## 19. 자주 나는 문제
+## 20. 자주 나는 문제
 
 ### pending에서 멈춤
 
