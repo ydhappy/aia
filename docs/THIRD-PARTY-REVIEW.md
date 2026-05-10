@@ -13,6 +13,8 @@ AIA는 현재 게임서버에 직접 로봇을 생성하지 않고, MySQL 큐와
 - MySQL 5.5 호환 SQL을 별도 파일로 유지합니다.
 - Java 8 연동 코드는 `integration/java8/`에 모여 있습니다.
 - Spawn Queue는 `pending/claimed/done/failed` 상태를 명확히 가집니다.
+- Spawn Queue Dashboard는 `server_name` 필터를 지원합니다.
+- 복구 API는 `server_name` 단위로 실행됩니다.
 - `/health/details`에서 MySQL 연결과 필수 테이블 존재 여부를 확인할 수 있습니다.
 - GitHub Actions에서 기본 품질 게이트와 MariaDB 통합 테스트를 실행합니다.
 - `runners/quality/run_quality_gates.py`와 `.ps1`로 로컬/CI 테스트 경로가 분리되어 있습니다.
@@ -57,7 +59,19 @@ GET /health/details
 
 `mysql.missing_tables`가 빈 배열이어야 합니다.
 
-### 4. Java Adapter 구현
+### 4. 서버별 Queue 확인
+
+여러 게임서버가 같은 AIA DB를 사용할 경우 반드시 `server_name` 필터를 적용해서 봅니다.
+
+```http
+GET /dashboard/robot-spawn-queue?server_name=main
+GET /dashboard/robot-spawn-queue/gui?server_name=main
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
+```
+
+복구 버튼도 현재 server_name 기준으로 실행합니다.
+
+### 5. Java Adapter 구현
 
 `integration/java8/AiaRobotSpawnAdapter.java`는 계약입니다. 실제 서버에서는 반드시 다음을 서버 코드에 연결해야 합니다.
 
@@ -88,7 +102,7 @@ GET /health/details
 
 - 서버 프로젝트에 실제 Adapter 구현 클래스를 별도로 작성.
 - 생성 실패 시 `failed` 상태와 `last_error`를 반드시 확인.
-- `/dashboard/robot-spawn-queue/gui?status=failed` 운영 확인.
+- `/dashboard/robot-spawn-queue/gui?status=failed&server_name=main` 운영 확인.
 
 ### R3. DB table 일부 미적용
 
@@ -111,29 +125,33 @@ GET /health/details
 
 ### R5. Dashboard 복구 버튼 오남용
 
-위험도: 중간
+위험도: 낮음에서 중간
 
 대응:
 
 - 운영자는 `server_name`과 `limit`를 확인한 뒤 실행.
-- 추후 server_name 드롭다운/필터를 추가하는 것이 좋습니다.
+- GUI에서 server_name 필터를 먼저 적용한 뒤 복구 버튼을 사용.
 
-## 다음 개선 우선순위
+## 반영 완료된 주요 개선
 
-### P1. Spawn Queue Dashboard server_name 필터
+### C1. Spawn Queue Dashboard server_name 필터
 
 목표:
 
 - 여러 서버가 같은 AIA DB를 볼 때 server별 상태를 분리.
 
-권장 API:
+지원 API:
 
 ```http
 GET /dashboard/robot-spawn-queue?server_name=main
+GET /dashboard/robot-spawn-queue?status=failed&server_name=main
 GET /dashboard/robot-spawn-queue/gui?server_name=main
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
 ```
 
-### P2. Adapter 구현 가이드 문서 보강
+## 다음 개선 우선순위
+
+### P1. Adapter 구현 가이드 문서 보강
 
 목표:
 
@@ -147,7 +165,7 @@ GET /dashboard/robot-spawn-queue/gui?server_name=main
 - World spawn 위치
 - AI scheduler 등록 위치
 
-### P3. CI 실패 대응 문서 추가
+### P2. CI 실패 대응 문서 추가
 
 목표:
 
@@ -160,13 +178,13 @@ GET /dashboard/robot-spawn-queue/gui?server_name=main
 - Java compile 실패
 - pip check 실패
 
-### P4. DB bridge PostgreSQL 명시 DDL 분리
+### P3. DB bridge PostgreSQL 명시 DDL 분리
 
 목표:
 
 - 현재는 주력 대상이 MySQL 5.5이지만, PostgreSQL backend를 유지한다면 문자열 치환 대신 명시 DDL이 안전합니다.
 
-### P5. 운영용 audit log
+### P4. 운영용 audit log
 
 목표:
 
@@ -196,7 +214,7 @@ powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 
 ```http
 GET /health/details
-GET /dashboard/robot-spawn-queue/gui
+GET /dashboard/robot-spawn-queue/gui?server_name=main
 ```
 
 ## 최종 판단
@@ -206,7 +224,6 @@ GET /dashboard/robot-spawn-queue/gui
 우선순위는 다음입니다.
 
 1. 인증/노출 안전성
-2. server_name 필터
-3. Adapter 실서버 구현 가이드
-4. CI 실패 대응 문서
-5. 운영 audit log
+2. Adapter 실서버 구현 가이드
+3. CI 실패 대응 문서
+4. 운영 audit log
