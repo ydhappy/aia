@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
+from app.core.live_json import LiveJsonFile
 from app.models.request_models import AgentState
 from app.services.server_context_service import server_context_service
 
@@ -19,35 +19,15 @@ class RobotAutonomyBaselineService:
     def __init__(self) -> None:
         self.config_path = Path(__file__).resolve().parents[1] / "config" / "robot_autonomy_defaults.json"
         self.top_profile_path = Path(__file__).resolve().parents[1] / "config" / "aia_robot_top_profile.json"
-        self._cache: dict[str, Any] | None = None
-        self._cache_mtime: float = -1.0
-        self._top_cache: dict[str, Any] | None = None
-        self._top_cache_mtime: float = -1.0
+        self.config_file = LiveJsonFile(self.config_path, fallback=self._fallback_config)
+        self.top_profile_file = LiveJsonFile(self.top_profile_path, fallback=lambda: {})
 
     def load(self, force: bool = False) -> dict[str, Any]:
-        if not self.config_path.exists():
-            return self._fallback_config()
-        mtime = self.config_path.stat().st_mtime
-        if not force and self._cache is not None and mtime == self._cache_mtime:
-            return self._cache
-        try:
-            loaded = json.loads(self.config_path.read_text(encoding="utf-8"))
-        except Exception:
-            loaded = self._fallback_config()
-        if not isinstance(loaded, dict):
-            loaded = self._fallback_config()
-        self._cache = loaded
-        self._cache_mtime = mtime
-        return loaded
+        return self.config_file.load(force=force)
 
     def save_operator_config(self, config: dict[str, Any]) -> dict[str, Any]:
         safe_config = config if isinstance(config, dict) else self._fallback_config()
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(
-            json.dumps(safe_config, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        return self.load(force=True)
+        return self.config_file.save(safe_config)
 
     def operator_view(self) -> dict[str, Any]:
         config = self.load()
@@ -58,6 +38,11 @@ class RobotAutonomyBaselineService:
         return {
             "config_path": str(self.config_path),
             "top_profile_path": str(self.top_profile_path),
+            "live_reload": {
+                "enabled": True,
+                "config": self.config_file.info(),
+                "top_profile": self.top_profile_file.info(),
+            },
             "no_db_required": True,
             "operator_editable": True,
             "server_context": server_context,
@@ -232,20 +217,7 @@ class RobotAutonomyBaselineService:
         }
 
     def load_top_profile(self, force: bool = False) -> dict[str, Any]:
-        if not self.top_profile_path.exists():
-            return {}
-        mtime = self.top_profile_path.stat().st_mtime
-        if not force and self._top_cache is not None and mtime == self._top_cache_mtime:
-            return self._top_cache
-        try:
-            loaded = json.loads(self.top_profile_path.read_text(encoding="utf-8"))
-        except Exception:
-            loaded = {}
-        if not isinstance(loaded, dict):
-            loaded = {}
-        self._top_cache = loaded
-        self._top_cache_mtime = mtime
-        return loaded
+        return self.top_profile_file.load(force=force)
 
     def _enabled_zones(self, config: dict[str, Any]) -> list[dict[str, Any]]:
         zones = config.get("hunt_zones", [])
