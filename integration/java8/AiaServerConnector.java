@@ -1,5 +1,7 @@
 package integration.java8;
 
+import java.io.IOException;
+
 public class AiaServerConnector {
     private final AiaServerConfig config;
     private final AiaRobotSpawnAdapter spawnAdapter;
@@ -17,6 +19,14 @@ public class AiaServerConnector {
         this.spawnAdapter = spawnAdapter;
         this.aiaClient = new LocalAiaClient(config.getAiaBaseUrl(), config.getApiKey());
         this.aiaClient.setTimeouts(config.getConnectTimeoutMs(), config.getReadTimeoutMs());
+    }
+
+    public static AiaServerConnector fromFile(String configPath, AiaRobotSpawnAdapter adapter) throws IOException {
+        return new AiaServerConnector(AiaServerConfig.fromFile(configPath), adapter);
+    }
+
+    public AiaServerConfig getConfig() {
+        return config;
     }
 
     public LocalAiaClient getAiaClient() {
