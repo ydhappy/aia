@@ -1,6 +1,6 @@
 import uuid
 
-from app.models.automation_models import (
+from app.models.auto import (
     AutomationDecisionResponse,
     AutomationTaskListResponse,
     AutomationTaskRequest,
