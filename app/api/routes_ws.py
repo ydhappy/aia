@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import settings
-from app.models.request_models import DecideRequest, ObserveRequest
+from app.models.req import DecideRequest, ObserveRequest
 from app.services.agent_service import agent_service
 
 
