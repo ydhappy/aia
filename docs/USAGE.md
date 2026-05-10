@@ -1,6 +1,6 @@
 # AIA 서버 연동 및 사용방법
 
-이 문서는 게임서버에 AIA를 붙여 로봇 자동생성, 판단, 대시보드를 사용하는 실제 절차만 정리합니다. 원클릭 실행 방식은 사용하지 않습니다.
+이 문서는 게임서버에 AIA를 붙여 로봇 자동생성, 판단, 대시보드를 사용하는 실제 절차만 정리합니다. 원클릭 실행 방식과 예제/샘플 전용 코드는 사용하지 않습니다.
 
 ## 1. 전체 흐름
 
@@ -69,9 +69,10 @@ python runners/setup/bootstrap_local.py
 
 `.env.example`을 `.env`로 복사한 뒤 서버 DB에 맞게 수정합니다.
 
-MySQL 5.5 예시:
+Local/MySQL 5.5 예시:
 
 ```env
+APP_ENV=local
 APP_HOST=127.0.0.1
 APP_PORT=8000
 ENABLE_API_KEY_AUTH=false
@@ -80,23 +81,49 @@ DB_BRIDGE_MYSQL_DSN=mysql+pymysql://root:password@127.0.0.1:3306/your_game_db
 STATE_STORE_MODE=memory
 ```
 
+LAN/public 바인딩 시에는 반드시 API key 인증을 켭니다.
+
+```env
+ENABLE_API_KEY_AUTH=true
+API_KEY=충분히_긴_랜덤_키
+```
+
 MySQL 5.5 호환 기준은 `utf8`입니다. JDBC도 `characterEncoding=utf8`로 맞춥니다.
 
 ## 5. DB 적용
 
-### 5-1. AIA 기본 DB bridge 테이블
+AIA 기본 DB bridge 테이블:
 
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 ```
 
-### 5-2. 로봇 자동생성 요청 큐
+로봇 자동생성 요청 큐:
 
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 ```
 
 `aia_robot_spawn_request`는 AIA가 로봇 생성 요청만 넣는 안전 큐입니다. 서버 원본 `robot`, `characters`, `robot_setting` 테이블은 AIA가 직접 수정하지 않습니다.
+
+적용 확인:
+
+```http
+GET /health/details
+```
+
+정상 기준:
+
+```text
+mysql.status = ok
+mysql.missing_tables = []
+```
+
+보안 경고도 함께 확인합니다.
+
+```text
+security.warnings
+```
 
 ## 6. AIA 실행
 
@@ -116,12 +143,11 @@ Linux:
 
 ```http
 GET http://127.0.0.1:8000/health
+GET http://127.0.0.1:8000/health/details
 GET http://127.0.0.1:8000/metrics
 ```
 
 ## 7. 로봇 생성 요청 만들기
-
-AIA HTTP API로 생성 요청을 넣습니다.
 
 ```http
 POST /robot/spawn-requests
@@ -150,21 +176,18 @@ POST /robot/spawn-requests
 
 ## 8. 게임서버에 넣을 Java 파일
 
-서버에 포함할 주요 파일:
+서버에 포함할 파일:
 
 ```text
 integration/java8/LocalAiaClient.java
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
+integration/java8/AiaDecisionParser.java
+integration/java8/DbDecisionPoller.java
 ```
 
-선택 예제:
-
-```text
-examples/java8/RobotCrudExample.java
-examples/java8/AiaRobotSpawnExample.java
-```
+예제/샘플 전용 Java main 파일은 유지하지 않습니다.
 
 ## 9. 게임서버 시작 루틴 연결
 
@@ -181,7 +204,7 @@ Server.start()
   -> startGameLoop()
 ```
 
-Java 예시:
+Java 연결 예:
 
 ```java
 private void runAiaRobotSpawnPoller() throws Exception {
@@ -246,8 +269,9 @@ AI scheduler에 등록되는가?
 
 ```http
 GET /dashboard/robot-spawn-queue
-GET /dashboard/robot-spawn-queue/gui
-GET /dashboard/robot-spawn-queue/gui?status=failed
+GET /dashboard/robot-spawn-queue?server_name=main
+GET /dashboard/robot-spawn-queue/gui?server_name=main
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
 ```
 
 상태 의미:
@@ -265,6 +289,8 @@ failed  : 생성 실패
 POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
 POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
+
+여러 서버가 같은 AIA DB를 볼 경우 반드시 `server_name` 필터를 사용합니다.
 
 ## 13. 로봇 판단 루프
 
@@ -290,7 +316,24 @@ HP/MP/무게 조건
 스킬 사용 가능 여부
 ```
 
-## 14. 로봇 CRUD
+## 14. 실시간 운영 설정 반영
+
+아래 JSON 파일은 `LiveJsonFile`로 읽습니다. 파일 수정 시간이 바뀌면 다음 요청에서 자동 reload됩니다.
+
+```text
+app/config/robot_autonomy_defaults.json
+app/config/aia_robot_top_profile.json
+```
+
+확인 API:
+
+```http
+GET /dashboard/robot-autonomy-baseline
+```
+
+응답의 `live_reload.enabled`가 `true`인지 확인합니다.
+
+## 15. 로봇 CRUD
 
 ```http
 GET    /robot
@@ -303,23 +346,46 @@ DELETE /robot/{agent_id}
 
 `DELETE /robot/{agent_id}`는 AIA 내부 runtime/profile/event/trace/learning만 삭제합니다. 게임서버의 실제 DB row와 world 객체는 게임서버가 직접 정리해야 합니다.
 
-## 15. 운영 화면
+## 16. 현재 짧은 Python 파일 구조
 
-```http
-GET /dashboard/robot-ai/gui
-GET /dashboard/robot-spawn-queue/gui
-GET /dashboard/robot-spawn-queue/gui?status=failed
+```text
+app/models/req.py
+app/models/res.py
+app/models/dash.py
+app/models/uni.py
+app/models/auto.py
+app/models/batch.py
+
+app/services/spawn.py
+app/services/spawn_dash.py
+app/services/autonomy.py
+app/ui/spawn_queue.py
 ```
 
-Spawn Queue GUI는 `total`, `needs_attention`, `pending/claimed/done/failed` 카드, failed 재시도, claimed 복구 버튼을 제공합니다.
+## 17. 테스트
 
-## 16. 테스트
+전체 품질 게이트:
 
 ```bash
-pytest tests/test_robot_crud_api.py
-pytest tests/test_robot_spawn_request_api.py
-pytest tests/test_spawn_request_dashboard.py
-pytest tests/test_mysql55_schema_compat.py
+python runners/quality/run_quality_gates.py
+```
+
+주요 개별 테스트:
+
+```bash
+pytest tests/test_mods.py
+pytest tests/test_auto_live.py
+pytest tests/test_spawn_api.py
+pytest tests/test_spawn_dash.py
+pytest tests/test_spawn_ui.py
+pytest tests/test_mysql55.py
+```
+
+선택형 MySQL 통합 테스트:
+
+```bash
+AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
+python -m pytest tests/test_mysql_spawn_queue_integration.py
 ```
 
 Smoke 테스트:
