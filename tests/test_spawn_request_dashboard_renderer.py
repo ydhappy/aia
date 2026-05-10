@@ -8,6 +8,7 @@ def test_spawn_queue_renderer_escapes_row_values_and_renders_actions() -> None:
             "reason": "",
             "operator_hint": "",
             "status_filter": "failed",
+            "server_name_filter": "main",
             "counts": {"pending": 1, "claimed": 2, "done": 3, "failed": 4},
             "total": 10,
             "needs_attention": 6,
@@ -34,9 +35,13 @@ def test_spawn_queue_renderer_escapes_row_values_and_renders_actions() -> None:
     )
     assert "AIA Robot Spawn Queue" in html
     assert "needs_attention=6" in html
+    assert "현재 서버 필터=main" in html
+    assert "server_name=main" in html
+    assert "서버 필터" in html
     assert "failed 재시도" in html
     assert "claimed 복구" in html
     assert "recoverClaimed" in html
+    assert "applyServerFilter" in html
     assert "req&lt;script&gt;" in html
     assert "로봇&lt;script&gt;" in html
     assert "bad&lt;script&gt;" in html
