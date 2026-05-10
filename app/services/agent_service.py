@@ -1,16 +1,16 @@
 from app.core.config import settings
 from app.graphs.agent_graph import agent_graph
 from app.models.batch_models import BatchDecideResponse, BatchObserveResponse
-from app.models.request_models import DecideRequest, ObserveRequest
-from app.models.response_models import AgentTraceResponse, DecideResponse, ObserveResponse
+from app.models.req import DecideRequest, ObserveRequest
+from app.models.res import AgentTraceResponse, DecideResponse, ObserveResponse
 from app.services.anomaly_detection_service import anomaly_detection_service
+from app.services.autonomy import robot_autonomy_baseline_service
 from app.services.group_learning_service import group_learning_service
 from app.services.growth_service import growth_service
 from app.services.llm_client import llm_client
 from app.services.llm_parser import llm_parser
 from app.services.meta_policy_service import meta_policy_service
 from app.services.policy_engine import policy_engine
-from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.runtime_overrides import runtime_overrides
 from app.services.store_factory import store
