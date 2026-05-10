@@ -4,6 +4,8 @@ AIA는 기존 Java 게임서버 옆에 붙이는 **로봇 AI 브리지**입니�
 
 AIA가 게임서버의 원본 캐릭터/로봇 테이블을 직접 조작하지 않습니다. AIA는 로봇 생성 요청, 판단 API, 학습, 대시보드를 제공하고, 실제 로봇 생성과 월드 등록은 기존 게임서버가 직접 수행합니다.
 
+서버에 로봇 관련 코드/테이블이 전혀 없는 경우를 위해 최소 서버 로봇 테이블과 JDBC 저장소도 제공합니다.
+
 ## 핵심 개념
 
 ```text
@@ -21,6 +23,26 @@ AIA
   -> tick마다 AIA ops-tick 호출
 ```
 
+## 서버에 로봇이 전혀 없는 경우
+
+최소 서버 소유 테이블을 먼저 적용합니다.
+
+```bash
+mysql -u root -p your_game_db < sql/server_robot_minimal_mysql55.sql
+```
+
+생성되는 서버 소유 테이블:
+
+```text
+server_robot
+server_robot_item
+server_robot_skill
+server_robot_ai_state
+server_robot_log
+```
+
+이 테이블은 AIA 전용 테이블이 아니라 **기존 게임서버가 소유하는 최소 로봇 테이블**입니다. AIA는 여기에 직접 insert하지 않고, Java `MinimalServerRobotAdapter` 또는 서버 전용 Adapter가 `createAndSpawn()`에서 insert합니다.
+
 ## 왜 이 구조인가
 
 기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`, `AiaRobotActionAdapter`, `AiaSpawnQueue`를 통해 기존 서버 코드가 직접 생성/실행/큐처리를 하게 합니다.
@@ -34,6 +56,7 @@ AIA
 월드 객체/AI scheduler 정상 등록
 AIA 장애 시에도 게임서버 보호
 MySQL 외 DB는 AiaSpawnQueue 구현으로 확장 가능
+로봇 테이블이 없는 서버도 최소 테이블로 시작 가능
 ```
 
 ## 빠른 시작
@@ -79,6 +102,12 @@ API_KEY=충분히_긴_랜덤_키
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
+```
+
+서버에 로봇 테이블이 없다면 추가 적용합니다.
+
+```bash
+mysql -u root -p your_game_db < sql/server_robot_minimal_mysql55.sql
 ```
 
 MSSQL/PostgreSQL/SQLite를 queue DB로 쓰려면 `aia_robot_spawn_request`와 AIA bridge 테이블 DDL을 해당 DB 문법에 맞게 만들어야 합니다. Java 쪽 queue 처리는 `AiaSpawnQueue`/`JdbcAiaSpawnQueue`로 분리되어 있습니다.
@@ -188,6 +217,8 @@ integration/java8/AiaDecision.java
 integration/java8/AiaDecisionParser.java
 integration/java8/AiaRobotActionAdapter.java
 integration/java8/AiaRobotActionRunner.java
+integration/java8/ServerRobotStore.java
+integration/java8/MinimalServerRobotAdapter.java
 integration/java8/DbDecisionPoller.java
 ```
 
@@ -198,10 +229,24 @@ private static AiaServerConnector aiaConnector;
 private static AiaRobotActionRunner actionRunner;
 
 private void bootAiaRobots() throws Exception {
-    aiaConnector = AiaServerConnector.fromFile(
-        "config/aia-server.properties",
-        new MyServerAiaRobotAdapter()
+    AiaRobotTemplateConfig template = AiaRobotTemplateConfig.fromFile("config/aia-robot-template.properties");
+    ServerRobotStore store = new ServerRobotStore(
+        "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
+        "root",
+        "password"
     );
+
+    MinimalServerRobotAdapter adapter = new MinimalServerRobotAdapter(
+        store,
+        template,
+        new MinimalServerRobotAdapter.ObjectIdProvider() {
+            public long nextObjectId() throws Exception {
+                return IdFactory.getInstance().nextId();
+            }
+        }
+    );
+
+    aiaConnector = AiaServerConnector.fromFile("config/aia-server.properties", adapter);
     int processed = aiaConnector.bootSpawnOnce();
     actionRunner = new AiaRobotActionRunner(aiaConnector, new MyServerAiaRobotActionAdapter());
     System.out.println("[AIA] spawn processed=" + processed);
@@ -229,6 +274,8 @@ int processed = aiaConnector.bootSpawnOnce(queue);
 
 ### Spawn Adapter
 
+서버에 로봇 구조가 이미 있으면 직접 구현합니다.
+
 ```java
 public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
     public boolean exists(AiaRobotSpawnRequest request) throws Exception {
@@ -252,6 +299,8 @@ public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
 }
 ```
 
+서버에 로봇 구조가 전혀 없으면 `MinimalServerRobotAdapter`로 시작하고, `afterCreateDatabaseRows()`를 override해서 실제 World 등록만 붙입니다.
+
 ### Action Adapter
 
 ```java
@@ -268,7 +317,7 @@ public class MyServerAiaRobotActionAdapter implements AiaRobotActionAdapter {
 }
 ```
 
-서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `CharacterTable`, `RobotTable`, `World`, `Inventory`, `Skill`, `AI scheduler`, `move/attack/skill` 함수에 연결해야 하는 기준 코드입니다.
+서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `World`, `Inventory`, `Skill`, `AI scheduler`, `move/attack/skill` 함수에 연결해야 하는 기준 코드입니다.
 
 ## AI tick에서 AIA 호출
 
