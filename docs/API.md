@@ -112,9 +112,11 @@ requests
 
 ```http
 GET /dashboard/robot-spawn-queue
+GET /dashboard/robot-spawn-queue?server_name=main
+GET /dashboard/robot-spawn-queue?status=failed&server_name=main
 GET /dashboard/robot-spawn-queue/gui
-GET /dashboard/robot-spawn-queue?status=failed
-GET /dashboard/robot-spawn-queue/gui?status=failed
+GET /dashboard/robot-spawn-queue/gui?server_name=main
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
 ```
 
 응답 주요 필드:
@@ -124,6 +126,7 @@ enabled
 reason
 operator_hint
 status_filter
+server_name_filter
 counts
 total
 needs_attention
@@ -136,6 +139,8 @@ recent
 POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
 POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
+
+복구 API는 항상 `server_name` 단위로 실행됩니다. 여러 서버가 같은 AIA DB를 공유할 경우 GUI에서도 server_name 필터를 먼저 적용한 뒤 복구 버튼을 사용합니다.
 
 ## 로봇 이벤트/학습
 
