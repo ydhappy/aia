@@ -77,12 +77,21 @@ class RobotProfilePatchRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+def default_robot_name_pool() -> list[str]:
+    return [
+        "가온", "나린", "다온", "라온", "마루", "바람", "새온", "아린",
+        "여울", "오름", "이든", "자온", "초아", "하람", "하온", "해솔",
+        "노을", "도담", "루아", "리온", "미르", "별하", "서온", "시온",
+        "아람", "유온", "은하", "재온", "태오", "파랑", "하늘", "해온",
+    ]
+
+
 class RobotSpawnRequestCreateRequest(BaseModel):
     server_name: str = Field(default="main", min_length=1, max_length=64)
     count: int = Field(default=30, ge=1, le=500)
     request_prefix: str = Field(default="aia-api", min_length=1, max_length=32)
-    agent_prefix: str = Field(default="aia_robot", min_length=1, max_length=32)
-    name_prefix: str = Field(default="AIA로봇", min_length=1, max_length=30)
+    agent_prefix: str = Field(default="aia", min_length=1, max_length=32)
+    name_pool: list[str] = Field(default_factory=default_robot_name_pool, min_length=1, max_length=500)
     classes: list[str] = Field(default_factory=lambda: ["knight", "elf", "wizard"], min_length=1, max_length=16)
     level_min: int = Field(default=1, ge=1, le=99)
     level_max: int = Field(default=30, ge=1, le=99)
@@ -100,6 +109,17 @@ class RobotSpawnRequestCreateRequest(BaseModel):
         if not cleaned:
             raise ValueError("classes_must_not_be_empty")
         self.classes = cleaned
+        names: list[str] = []
+        seen: set[str] = set()
+        for item in self.name_pool:
+            name = str(item).strip()
+            if not name or name in seen:
+                continue
+            names.append(name)
+            seen.add(name)
+        if len(names) < self.count:
+            raise ValueError("name_pool_unique_count_must_be_greater_than_or_equal_to_count")
+        self.name_pool = names
         return self
 
 
