@@ -1,5 +1,5 @@
-from app.models.request_models import AgentState
-from app.models.response_models import DecideResponse
+from app.models.req import AgentState
+from app.models.res import DecideResponse
 
 
 ALLOWED_ACTIONS = {"MOVE", "ATTACK", "USE_SKILL", "RETREAT", "PICKUP", "IDLE"}
