@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.models.automation_models import AutomationTaskRequest
+from app.models.auto import AutomationTaskRequest
 from app.models.dash import RobotAiOpsDashboardResponse
 from app.models.req import (
     DecideRequest,
