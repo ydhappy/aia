@@ -14,9 +14,10 @@ class SpawnRequestDashboardService:
     def _connect(self):
         return connect_mysql(settings.db_bridge_mysql_dsn)
 
-    def summary(self, limit: int = 30, status: str | None = None) -> dict:
+    def summary(self, limit: int = 30, status: str | None = None, server_name: str | None = None) -> dict:
         limit = max(1, min(int(limit or 30), 200))
         status = self._clean_status(status)
+        server_name = self._clean_optional_server(server_name)
         if settings.db_bridge_backend.lower() != "mysql":
             counts = self._empty_counts()
             return {
@@ -24,6 +25,7 @@ class SpawnRequestDashboardService:
                 "reason": "db_bridge_backend_not_mysql",
                 "operator_hint": "Set DB_BRIDGE_BACKEND=mysql and configure DB_BRIDGE_MYSQL_DSN.",
                 "status_filter": status,
+                "server_name_filter": server_name,
                 "counts": counts,
                 "total": 0,
                 "needs_attention": 0,
@@ -32,18 +34,33 @@ class SpawnRequestDashboardService:
         try:
             with self._connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT status, COUNT(*) AS cnt FROM aia_robot_spawn_request GROUP BY status ORDER BY status")
+                    count_sql = "SELECT status, COUNT(*) AS cnt FROM aia_robot_spawn_request"
+                    count_params: list = []
+                    if server_name:
+                        count_sql += " WHERE server_name = %s"
+                        count_params.append(server_name)
+                    count_sql += " GROUP BY status ORDER BY status"
+                    cur.execute(count_sql, tuple(count_params))
                     counts = self._empty_counts()
                     counts.update({str(row["status"]): int(row["cnt"] or 0) for row in cur.fetchall()})
+
                     base_sql = (
                         "SELECT uid, request_id, server_name, agent_id, name, class_type, level, "
                         "loc_x, loc_y, loc_map, priority, status, attempts, last_error, created_at, claimed_at, done_at "
                         "FROM aia_robot_spawn_request"
                     )
+                    where_clauses = []
+                    params: list = []
                     if status:
-                        cur.execute(base_sql + " WHERE status = %s ORDER BY uid DESC LIMIT %s", (status, limit))
-                    else:
-                        cur.execute(base_sql + " ORDER BY uid DESC LIMIT %s", (limit,))
+                        where_clauses.append("status = %s")
+                        params.append(status)
+                    if server_name:
+                        where_clauses.append("server_name = %s")
+                        params.append(server_name)
+                    if where_clauses:
+                        base_sql += " WHERE " + " AND ".join(where_clauses)
+                    params.append(limit)
+                    cur.execute(base_sql + " ORDER BY uid DESC LIMIT %s", tuple(params))
                     rows = list(cur.fetchall())
             total = sum(counts.values())
             needs_attention = counts.get("failed", 0) + counts.get("claimed", 0)
@@ -52,6 +69,7 @@ class SpawnRequestDashboardService:
                 "reason": "",
                 "operator_hint": "",
                 "status_filter": status,
+                "server_name_filter": server_name,
                 "counts": counts,
                 "total": total,
                 "needs_attention": needs_attention,
@@ -64,6 +82,7 @@ class SpawnRequestDashboardService:
                 "reason": str(exc),
                 "operator_hint": "Check MySQL connection, table sql/aia_robot_spawn_request_mysql55.sql, and DB user permissions.",
                 "status_filter": status,
+                "server_name_filter": server_name,
                 "counts": counts,
                 "total": 0,
                 "needs_attention": 0,
@@ -118,8 +137,8 @@ class SpawnRequestDashboardService:
                 "updated": 0,
             }
 
-    def render_html(self, limit: int = 30, status: str | None = None) -> str:
-        return render_spawn_queue_html(self.summary(limit, status))
+    def render_html(self, limit: int = 30, status: str | None = None, server_name: str | None = None) -> str:
+        return render_spawn_queue_html(self.summary(limit, status, server_name))
 
     def _reset_status(self, from_status: str, message: str, server_name: str, limit: int) -> dict:
         limit = max(1, min(int(limit or 50), 500))
@@ -170,9 +189,16 @@ class SpawnRequestDashboardService:
         value = str(status or "").strip().lower()
         return value if value in VALID_STATUSES else None
 
+    def _clean_optional_server(self, server_name: str | None) -> str | None:
+        value = str(server_name or "").strip()
+        if not value:
+            return None
+        return self._clean_server(value)
+
     def _clean_server(self, server_name: str | None) -> str:
         value = str(server_name or "main").strip()
-        return value[:64] or "main"
+        safe = "".join(ch for ch in value if ch.isalnum() or ch in {"_", "-", "."})
+        return safe[:64] or "main"
 
 
 spawn_request_dashboard_service = SpawnRequestDashboardService()
