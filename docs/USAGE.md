@@ -1,75 +1,59 @@
-# AIA 서버 연동 및 사용방법
+# AIA 서버 연동 상세 사용방법
 
-이 문서는 게임서버에 AIA를 붙여 로봇 자동생성, 판단, 대시보드를 사용하는 실제 절차만 정리합니다. 원클릭 실행 방식과 예제/샘플 전용 코드는 사용하지 않습니다.
+이 문서는 기존 Java 게임서버에 AIA를 붙이는 실제 작업 순서를 설명합니다. 핵심은 AIA가 서버 DB에 직접 로봇을 insert하지 않고, 기존 게임서버가 `AiaRobotSpawnAdapter`를 구현하여 자기 방식대로 로봇을 생성하게 하는 것입니다.
 
-## 1. 전체 흐름
+## 1. 전체 구조
+
+```text
+AIA
+  - HTTP API 제공
+  - 로봇 생성 요청 queue 생성
+  - 로봇 profile/learning/dashboard 관리
+  - ops-tick 판단 제공
+
+기존 게임서버
+  - queue에서 pending 요청 poll
+  - 서버 IdFactory로 objectId 발급
+  - 서버 DB에 robot/character insert
+  - inventory/skill 지급
+  - World에 객체 등록
+  - AI scheduler 등록
+  - tick마다 AIA에 상태 전송 후 판단 수신
+```
+
+## 2. 작업 순서 요약
 
 ```text
 1. AIA 설치
 2. .env 설정
 3. MySQL 5.5 SQL 적용
 4. AIA 실행
-5. AIA에 로봇 생성 요청 생성
-6. 게임서버 시작 루틴에 SpawnPoller 연결
-7. 게임서버 Adapter에서 실제 로봇 생성
-8. 생성된 로봇을 ops-tick 판단 루프에 연결
-9. dashboard/gui로 상태 확인
+5. POST /robot/spawn-requests로 생성 요청 적재
+6. 기존 게임서버에 integration/java8 파일 복사
+7. 기존 서버 시작 루틴에 AiaRobotSpawnPoller 연결
+8. 기존 서버 코드에 MyServerAiaRobotAdapter 구현
+9. 기존 로봇 AI tick 또는 NPC/robot update loop에서 ops-tick 호출
+10. dashboard로 pending/failed/done 상태 확인
 ```
 
-## 2. 역할 분리
-
-AIA는 실제 게임 월드 객체를 만들지 않습니다. AIA는 생성 요청과 AI 판단을 제공하고, 게임서버가 실제 DB insert, objectId 발급, world spawn, 이동/공격/스킬 실행을 담당합니다.
-
-```text
-AIA
-  - 로봇 생성 요청 생성
-  - 로봇 profile 관리
-  - observe/decide/ops-tick 판단
-  - feedback/learning 저장
-  - spawn queue/dashboard 제공
-
-게임서버
-  - objectId 발급
-  - robot/character DB insert
-  - inventory/skill 지급
-  - world spawn/despawn
-  - 이동/공격/스킬 실행
-  - AIA 응답 최종 검증
-```
-
-## 3. 설치
+## 3. AIA 설치
 
 ```bash
 git clone <repo-url>
 cd aia
 python -m venv .venv
+python -m pip install -r requirements.txt
 ```
 
-Windows:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-Linux:
-
-```bash
-./.venv/bin/python -m pip install --upgrade pip
-./.venv/bin/python -m pip install -r requirements.txt
-```
-
-자동 준비 스크립트:
+또는:
 
 ```bash
 python runners/setup/bootstrap_local.py
 ```
 
-## 4. 환경 설정
+## 4. `.env` 설정
 
-`.env.example`을 `.env`로 복사한 뒤 서버 DB에 맞게 수정합니다.
-
-Local/MySQL 5.5 예시:
+기본 local 설정:
 
 ```env
 APP_ENV=local
@@ -81,79 +65,64 @@ DB_BRIDGE_MYSQL_DSN=mysql+pymysql://root:password@127.0.0.1:3306/your_game_db
 STATE_STORE_MODE=memory
 ```
 
-LAN/public 바인딩 시에는 반드시 API key 인증을 켭니다.
+외부 IP/LAN에 열 경우:
 
 ```env
 ENABLE_API_KEY_AUTH=true
 API_KEY=충분히_긴_랜덤_키
 ```
 
-MySQL 5.5 호환 기준은 `utf8`입니다. JDBC도 `characterEncoding=utf8`로 맞춥니다.
+Java 쪽 `LocalAiaClient`에도 같은 API key를 넣습니다.
 
-## 5. DB 적용
+```java
+LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "충분히_긴_랜덤_키");
+```
 
-AIA 기본 DB bridge 테이블:
+## 5. MySQL 5.5 SQL 적용
+
+AIA 기본 테이블:
 
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 ```
 
-로봇 자동생성 요청 큐:
+로봇 생성 요청 큐:
 
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 ```
 
-`aia_robot_spawn_request`는 AIA가 로봇 생성 요청만 넣는 안전 큐입니다. 서버 원본 `robot`, `characters`, `robot_setting` 테이블은 AIA가 직접 수정하지 않습니다.
-
-적용 확인:
+확인:
 
 ```http
 GET /health/details
 ```
 
-정상 기준:
+정상:
 
 ```text
 mysql.status = ok
 mysql.missing_tables = []
 ```
 
-보안 경고도 함께 확인합니다.
-
-```text
-security.warnings
-```
-
 ## 6. AIA 실행
 
-Windows:
-
-```powershell
-.\.venv\Scripts\python.exe runners/server/run_local_aia.py
-```
-
-Linux:
-
 ```bash
-./.venv/bin/python runners/server/run_local_aia.py
+python runners/server/run_local_aia.py
 ```
 
-실행 후 확인:
+확인:
 
 ```http
 GET http://127.0.0.1:8000/health
 GET http://127.0.0.1:8000/health/details
-GET http://127.0.0.1:8000/metrics
 ```
 
-## 7. 로봇 생성 요청 만들기
+## 7. 로봇 생성 요청 넣기
 
 ```http
 POST /robot/spawn-requests
 ```
-
-예시:
 
 ```json
 {
@@ -172,11 +141,15 @@ POST /robot/spawn-requests
 }
 ```
 
-결과는 `aia_robot_spawn_request`에 `pending` 상태로 저장됩니다.
+`server_name`은 Java poller의 `serverName`과 반드시 같아야 합니다.
 
-## 8. 게임서버에 넣을 Java 파일
+```java
+new AiaRobotSpawnPoller(..., "main", aia, adapter)
+```
 
-서버에 포함할 파일:
+## 8. 기존 게임서버에 복사할 Java 파일
+
+기존 서버 소스 트리에 아래 파일을 복사합니다.
 
 ```text
 integration/java8/LocalAiaClient.java
@@ -187,63 +160,162 @@ integration/java8/AiaDecisionParser.java
 integration/java8/DbDecisionPoller.java
 ```
 
-예제/샘플 전용 Java main 파일은 유지하지 않습니다.
-
-## 9. 게임서버 시작 루틴 연결
-
-게임서버가 DB/NPC/맵/월드 기본 로드를 끝낸 뒤, 게임 루프 시작 전에 poller를 한 번 실행하는 방식이 가장 안전합니다.
+권장 위치 예:
 
 ```text
-Server.start()
-  -> loadConfig()
-  -> loadDatabase()
-  -> loadWorld()
-  -> loadNpc()
-  -> loadMaps()
-  -> runAiaRobotSpawnPoller()
-  -> startGameLoop()
+server/src/integration/java8/
 ```
 
-Java 연결 예:
+또는 기존 서버 패키지 정책에 맞춰 다음처럼 옮겨도 됩니다.
+
+```text
+server/src/l1j/server/aia/
+```
+
+패키지를 바꿀 경우 Java 파일 상단의 package도 같이 바꿔야 합니다.
+
+## 9. 기존 서버 시작 루틴에 넣는 위치
+
+AIA spawn poller는 서버가 DB와 월드 기본 로딩을 끝낸 뒤 실행해야 합니다.
+
+권장 위치:
+
+```text
+GameServer.start()
+  -> Config.load()
+  -> DatabaseFactory.init()
+  -> IdFactory.load()
+  -> MapTable.load()
+  -> NpcTable.load()
+  -> ItemTable.load()
+  -> SkillTable.load()
+  -> World 초기화
+  -> AIA 로봇 생성 poller 실행
+  -> acceptor/listener open
+  -> game loop start
+```
+
+즉, 아래보다 뒤에 둡니다.
+
+```text
+DB 연결 완료 후
+IdFactory 준비 후
+맵 로드 완료 후
+NPC/아이템/스킬 테이블 로드 후
+World singleton 준비 후
+```
+
+아래보다 앞에 두는 것을 권장합니다.
+
+```text
+외부 유저 접속 허용 전
+전체 게임 루프 완전 시작 전
+```
+
+## 10. 기존 서버에 Bootstrap 클래스 작성
+
+기존 게임서버 안에 예를 들어 아래 파일을 만듭니다.
+
+```text
+server/src/.../aia/MyServerAiaBootstrap.java
+```
+
+예시:
 
 ```java
-private void runAiaRobotSpawnPoller() throws Exception {
-    LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "");
-    AiaRobotSpawnAdapter adapter = new MyServerRobotAdapter();
+import integration.java8.AiaRobotSpawnAdapter;
+import integration.java8.AiaRobotSpawnPoller;
+import integration.java8.LocalAiaClient;
 
-    AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
-        "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
-        "root",
-        "password",
-        "main",
-        aia,
-        adapter
-    );
+public final class MyServerAiaBootstrap {
+    private MyServerAiaBootstrap() {
+    }
 
-    poller.setBatchSize(20);
-    poller.runOnce();
+    public static void bootOnce() {
+        try {
+            LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "");
+            aia.setTimeouts(3000, 5000);
+
+            AiaRobotSpawnAdapter adapter = new MyServerAiaRobotAdapter();
+
+            AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
+                "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
+                "root",
+                "password",
+                "main",
+                aia,
+                adapter
+            );
+
+            poller.setBatchSize(20);
+            int created = poller.runOnce();
+            System.out.println("[AIA] spawned or processed robots=" + created);
+        } catch (Exception e) {
+            System.out.println("[AIA] boot failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 }
 ```
 
-## 10. 서버 Adapter 구현
+## 11. 기존 `GameServer.start()`에 호출 추가
 
-서버별로 반드시 구현할 부분입니다. 여기에서 실제 서버의 `IdFactory`, `RobotTable`, `World`, `Inventory`, `Skill` 로직을 연결합니다.
+예시입니다. 실제 클래스명은 서버마다 다릅니다.
 
 ```java
-public class MyServerRobotAdapter implements AiaRobotSpawnAdapter {
+public class GameServer {
+    public void start() throws Exception {
+        loadConfig();
+        initDatabase();
+        loadIdFactory();
+        loadMaps();
+        loadNpc();
+        loadItems();
+        loadSkills();
+        initWorld();
+
+        // AIA 추가 위치
+        MyServerAiaBootstrap.bootOnce();
+
+        startLoginServer();
+        startGameLoop();
+    }
+}
+```
+
+이미 서버에 `Server`, `L1Server`, `GameServer`, `LoginController`, `GeneralThreadPool` 같은 시작 클래스가 있다면, 위 순서와 가장 가까운 위치에 넣습니다.
+
+## 12. 기존 서버에 Adapter 클래스 작성
+
+파일 예:
+
+```text
+server/src/.../aia/MyServerAiaRobotAdapter.java
+```
+
+기본 골격:
+
+```java
+import integration.java8.AiaRobotSpawnAdapter;
+import integration.java8.AiaRobotSpawnRequest;
+
+public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
     public boolean exists(AiaRobotSpawnRequest request) throws Exception {
         // agent_id 또는 name 기준으로 이미 생성된 로봇인지 확인
+        // 예: RobotTable.findByAgentId(request.agentId) != null
+        // 예: CharacterTable.doesCharNameExist(request.name)
         return false;
     }
 
     public long createAndSpawn(AiaRobotSpawnRequest request) throws Exception {
-        // 1. 서버 IdFactory로 objectId 발급
-        // 2. 서버 robot/character 테이블 insert
-        // 3. 기본 inventory/skill 지급
-        // 4. request.locX, request.locY, request.locMap, request.heading 적용
-        // 5. World에 객체 등록
-        // 6. AI scheduler에 등록
-        // 7. 생성된 objectId 반환
+        // 1. objectId 발급
+        // 2. 로봇 객체 생성
+        // 3. DB insert
+        // 4. inventory/skill 지급
+        // 5. 좌표/맵/heading 설정
+        // 6. World 등록
+        // 7. AI scheduler 등록
+        // 8. objectId 반환
         return 0L;
     }
 
@@ -253,100 +325,487 @@ public class MyServerRobotAdapter implements AiaRobotSpawnAdapter {
 }
 ```
 
-## 11. Adapter 구현 체크리스트
+## 13. `exists()`에는 무엇을 작성해야 하나
+
+목적은 중복 생성 방지입니다.
+
+기존 서버에 아래 중 하나가 있으면 사용합니다.
 
 ```text
-objectId가 서버 IdFactory에서 발급되는가?
-DB insert와 world spawn이 같은 로봇 정보를 쓰는가?
-좌표/map/heading이 request 값과 일치하는가?
-inventory/skill 기본값이 비어 있지 않은가?
-AI scheduler에 등록되는가?
-중복 name/agent_id 생성이 막히는가?
-예외 발생 시 failed 상태로 남는가?
+캐릭터 이름 중복 검사
+로봇 이름 중복 검사
+agent_id metadata 검사
+objectId 검사
 ```
 
-## 12. Spawn Queue 상태 확인
+예시:
+
+```java
+public boolean exists(AiaRobotSpawnRequest request) throws Exception {
+    if (request == null) {
+        return true;
+    }
+
+    // 서버에 캐릭터 이름 중복 검사 함수가 있는 경우
+    if (CharacterTable.getInstance().doesCharNameExist(request.name)) {
+        return true;
+    }
+
+    // 서버에 로봇 테이블이 있는 경우
+    if (RobotTable.getInstance().findByAgentId(request.agentId) != null) {
+        return true;
+    }
+
+    return false;
+}
+```
+
+서버에 `agent_id` 컬럼이 없다면 우선 name 기준 중복만 막고, 추후 robot metadata/table에 `agent_id`를 추가하는 것이 좋습니다.
+
+## 14. `createAndSpawn()`에는 무엇을 작성해야 하나
+
+아래 7단계를 기존 서버 코드에 맞춰 연결합니다.
+
+### 14-1. objectId 발급
+
+기존 서버 IdFactory를 사용합니다.
+
+```java
+int objectId = IdFactory.getInstance().nextId();
+```
+
+또는 서버가 사용하는 실제 방식으로 바꿉니다.
+
+```java
+int objectId = ObjectIdFactory.nextId();
+```
+
+### 14-2. 로봇/캐릭터 객체 생성
+
+기존 서버의 PC/Robot 클래스에 맞춥니다.
+
+```java
+L1RobotInstance robot = new L1RobotInstance();
+robot.setId(objectId);
+robot.setName(request.name);
+robot.setX(request.locX);
+robot.setY(request.locY);
+robot.setMap((short) request.locMap);
+robot.setHeading(request.heading);
+robot.setLevel(request.level);
+```
+
+서버가 `L1PcInstance` 기반 로봇을 사용한다면:
+
+```java
+L1PcInstance robot = new L1PcInstance();
+robot.setId(objectId);
+robot.setName(request.name);
+robot.setX(request.locX);
+robot.setY(request.locY);
+robot.setMap((short) request.locMap);
+robot.setHeading(request.heading);
+```
+
+### 14-3. class type 매핑
+
+AIA request의 `classType` / `classId`를 서버 class id로 변환합니다.
+
+```java
+private int toServerClassId(AiaRobotSpawnRequest request) {
+    if ("royal".equals(request.classType)) return 0;
+    if ("knight".equals(request.classType)) return 1;
+    if ("elf".equals(request.classType)) return 2;
+    if ("wizard".equals(request.classType)) return 3;
+    return request.classId;
+}
+```
+
+서버마다 class id가 다르면 여기만 바꿉니다.
+
+### 14-4. DB insert
+
+기존 서버가 사용하는 저장 함수를 호출합니다.
+
+```java
+RobotTable.getInstance().insert(robot);
+CharacterTable.getInstance().storeNewCharacter(robot);
+```
+
+직접 SQL을 쓰는 서버라면, 기존 insert SQL과 같은 컬럼을 사용해야 합니다.
+
+중요:
+
+```text
+AIA queue table에 insert하는 것이 아닙니다.
+기존 서버의 robot/characters 테이블에 insert해야 합니다.
+서버가 로그인/월드에서 읽는 테이블과 동일해야 합니다.
+```
+
+### 14-5. 기본 아이템/스킬 지급
+
+기존 서버 함수 사용:
+
+```java
+RobotInventoryFactory.giveBasicItems(robot);
+RobotSkillFactory.giveBasicSkills(robot, request.classType);
+```
+
+없으면 최소한 아래를 보장합니다.
+
+```text
+무기 1개
+방어구 기본값
+HP potion
+귀환/이동 수단
+클래스별 기본 skill
+```
+
+### 14-6. World 등록
+
+기존 서버 World 등록 함수를 호출합니다.
+
+```java
+World.getInstance().storeObject(robot);
+World.getInstance().addVisibleObject(robot);
+```
+
+또는 서버 방식에 따라:
+
+```java
+L1World.getInstance().storeObject(robot);
+L1World.getInstance().addVisibleObject(robot);
+```
+
+### 14-7. AI scheduler 등록
+
+기존 로봇 AI 실행기에 등록합니다.
+
+```java
+RobotAiScheduler.getInstance().register(robot);
+```
+
+또는 thread pool 방식이면:
+
+```java
+GeneralThreadPool.getInstance().schedule(new RobotAiTask(robot), 1000L);
+```
+
+### 14-8. 최종 반환
+
+```java
+return objectId;
+```
+
+## 15. Adapter 전체 예시
+
+아래는 그대로 복붙 완성 코드가 아니라, 기존 서버 함수명에 맞춰 바꿔야 하는 연결 예시입니다.
+
+```java
+import integration.java8.AiaRobotSpawnAdapter;
+import integration.java8.AiaRobotSpawnRequest;
+
+public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
+    public boolean exists(AiaRobotSpawnRequest request) throws Exception {
+        if (request == null) {
+            return true;
+        }
+        if (CharacterTable.getInstance().doesCharNameExist(request.name)) {
+            return true;
+        }
+        return RobotTable.getInstance().findByAgentId(request.agentId) != null;
+    }
+
+    public long createAndSpawn(AiaRobotSpawnRequest request) throws Exception {
+        int objectId = IdFactory.getInstance().nextId();
+
+        L1RobotInstance robot = new L1RobotInstance();
+        robot.setId(objectId);
+        robot.setName(request.name);
+        robot.setLevel(request.level);
+        robot.setClassId(toServerClassId(request));
+        robot.setX(request.locX);
+        robot.setY(request.locY);
+        robot.setMap((short) request.locMap);
+        robot.setHeading(request.heading);
+        robot.setAgentId(request.agentId);
+        robot.setAiRole(request.role);
+        robot.setAiStyle(request.style);
+
+        CharacterTable.getInstance().storeNewCharacter(robot);
+        RobotTable.getInstance().insert(robot);
+
+        RobotInventoryFactory.giveBasicItems(robot);
+        RobotSkillFactory.giveBasicSkills(robot, request.classType);
+
+        L1World.getInstance().storeObject(robot);
+        L1World.getInstance().addVisibleObject(robot);
+
+        RobotAiScheduler.getInstance().register(robot);
+        return objectId;
+    }
+
+    public void afterSpawn(AiaRobotSpawnRequest request, long serverObjectId) throws Exception {
+        System.out.println("[AIA] spawned robot name=" + request.name + " objectId=" + serverObjectId);
+    }
+
+    private int toServerClassId(AiaRobotSpawnRequest request) {
+        if ("royal".equals(request.classType)) return 0;
+        if ("knight".equals(request.classType)) return 1;
+        if ("elf".equals(request.classType)) return 2;
+        if ("wizard".equals(request.classType)) return 3;
+        return request.classId;
+    }
+}
+```
+
+## 16. 로봇 AI tick에 AIA 판단 붙이는 위치
+
+기존 서버에 로봇 AI loop가 있을 가능성이 큽니다.
+
+예상 위치:
+
+```text
+RobotAI.run()
+RobotController.tick()
+RobotInstance.onAiTick()
+NpcAIThread.run()
+GeneralThreadPool scheduled task
+```
+
+기존 로봇 AI tick 안에서 다음 순서로 붙입니다.
+
+```text
+1. 서버 로봇 객체 상태 수집
+2. AIA ops-tick JSON 생성
+3. LocalAiaClient.opsTick(json) 호출
+4. AiaDecisionParser로 action 파싱
+5. 서버 자체 검증
+6. 기존 move/attack/skill 함수 호출
+```
+
+예시:
+
+```java
+public void onRobotAiTick(L1RobotInstance robot) {
+    try {
+        LocalAiaClient aia = AiaClientHolder.get();
+        String json = buildOpsTickJson(robot);
+        String response = aia.opsTick(json);
+        AiaDecision decision = AiaDecisionParser.parse(response);
+
+        if (!isDecisionAllowed(robot, decision)) {
+            return;
+        }
+
+        executeDecision(robot, decision);
+    } catch (Exception e) {
+        // AIA 장애 시 기존 AI fallback 또는 idle
+        robot.doIdle();
+    }
+}
+```
+
+## 17. ops-tick JSON 생성 위치
+
+서버 로봇 객체에서 현재 상태를 읽어 JSON을 만듭니다.
+
+```java
+private String buildOpsTickJson(L1RobotInstance robot) {
+    return "{"
+        + "\"observe\":{"
+        + "\"agent_id\":\"" + robot.getAgentId() + "\","
+        + "\"tick\":" + System.currentTimeMillis() + ","
+        + "\"state\":{"
+        + "\"hp\":" + robot.getCurrentHp() + ","
+        + "\"mp\":" + robot.getCurrentMp() + ","
+        + "\"x\":" + robot.getX() + ","
+        + "\"y\":" + robot.getY() + ","
+        + "\"map_id\":" + robot.getMapId() + ","
+        + "\"target_id\":" + jsonString(robot.getTargetId()) + ","
+        + "\"target_distance\":" + robot.getTargetDistance() + ","
+        + "\"is_under_attack\":" + robot.isUnderAttack() + ","
+        + "\"nearby_enemies\":" + robot.countNearbyEnemies() + ","
+        + "\"nearby_allies\":" + robot.countNearbyAllies() + ","
+        + "\"safe_zone\":" + robot.isSafetyZone() + ","
+        + "\"can_teleport\":" + robot.canTeleport() + ","
+        + "\"must_use_hp_item\":" + (robot.getCurrentHpPercent() < 35) + ","
+        + "\"weight_percent\":" + robot.getWeightPercent()
+        + "}"
+        + "},"
+        + "\"include_dashboard\":false"
+        + "}";
+}
+```
+
+실제 서버에서는 문자열 직접 조립보다 기존 JSON 라이브러리가 있으면 그것을 사용합니다.
+
+## 18. AIA 결정 실행 위치
+
+AIA 응답은 서버에서 반드시 검증한 뒤 실행합니다.
+
+```java
+private void executeDecision(L1RobotInstance robot, AiaDecision decision) {
+    String action = decision.getAction();
+
+    if ("MOVE".equals(action)) {
+        robotMoveService.move(robot, decision.getArgs());
+        return;
+    }
+
+    if ("ATTACK".equals(action)) {
+        robotAttackService.attack(robot, decision.getArgs());
+        return;
+    }
+
+    if ("USE_SKILL".equals(action)) {
+        robotSkillService.useSkill(robot, decision.getArgs());
+        return;
+    }
+
+    if ("RETREAT".equals(action)) {
+        robotMoveService.returnHome(robot);
+        return;
+    }
+
+    if ("PICKUP".equals(action)) {
+        robotItemService.pickupNearby(robot);
+        return;
+    }
+
+    robot.doIdle();
+}
+```
+
+검증 예:
+
+```java
+private boolean isDecisionAllowed(L1RobotInstance robot, AiaDecision decision) {
+    if (decision == null) return false;
+    if (robot.isDead()) return false;
+    if ("ATTACK".equals(decision.getAction()) && robot.getTarget() == null) return false;
+    if ("USE_SKILL".equals(decision.getAction()) && robot.isSkillDelay()) return false;
+    if ("MOVE".equals(decision.getAction()) && robot.isParalyzed()) return false;
+    return true;
+}
+```
+
+## 19. 실패/복구 확인
+
+GUI:
 
 ```http
-GET /dashboard/robot-spawn-queue
-GET /dashboard/robot-spawn-queue?server_name=main
 GET /dashboard/robot-spawn-queue/gui?server_name=main
 GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
 ```
 
-상태 의미:
-
-```text
-pending : 서버가 아직 처리하지 않음
-claimed : 서버가 처리 대상으로 잡음
-done    : 생성 완료
-failed  : 생성 실패
-```
-
-복구 API:
+실패 재시도:
 
 ```http
 POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
+```
+
+오래된 claimed 복구:
+
+```http
 POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
 ```
 
-여러 서버가 같은 AIA DB를 볼 경우 반드시 `server_name` 필터를 사용합니다.
+## 20. 운영 설정 실시간 반영
 
-## 13. 로봇 판단 루프
-
-로봇이 생성된 뒤 게임서버는 tick마다 AIA에 상태를 보내고 판단을 받습니다.
-
-권장 API:
-
-```http
-POST /api/v1/robot/ops-tick
-```
-
-게임서버는 AIA 응답을 바로 실행하지 말고 반드시 검증합니다.
-
-검증 항목:
-
-```text
-맵 일치 여부
-이동 가능 타일 여부
-타겟 생존 여부
-거리/쿨타임 조건
-안전지대 전투 금지
-HP/MP/무게 조건
-스킬 사용 가능 여부
-```
-
-## 14. 실시간 운영 설정 반영
-
-아래 JSON 파일은 `LiveJsonFile`로 읽습니다. 파일 수정 시간이 바뀌면 다음 요청에서 자동 reload됩니다.
+아래 JSON은 AIA 재시작 없이 다음 요청에서 자동 반영됩니다.
 
 ```text
 app/config/robot_autonomy_defaults.json
 app/config/aia_robot_top_profile.json
 ```
 
-확인 API:
+확인:
 
 ```http
 GET /dashboard/robot-autonomy-baseline
 ```
 
-응답의 `live_reload.enabled`가 `true`인지 확인합니다.
+`live_reload.enabled = true`이면 정상입니다.
 
-## 15. 로봇 CRUD
+## 21. 테스트
 
-```http
-GET    /robot
-POST   /robot/profile
-PUT    /robot/{agent_id}/profile
-PATCH  /robot/{agent_id}/profile
-GET    /robot/{agent_id}
-DELETE /robot/{agent_id}
+전체:
+
+```bash
+python runners/quality/run_quality_gates.py
 ```
 
-`DELETE /robot/{agent_id}`는 AIA 내부 runtime/profile/event/trace/learning만 삭제합니다. 게임서버의 실제 DB row와 world 객체는 게임서버가 직접 정리해야 합니다.
+주요 개별:
 
-## 16. 현재 짧은 Python 파일 구조
+```bash
+pytest tests/test_mods.py
+pytest tests/test_auto_live.py
+pytest tests/test_spawn_api.py
+pytest tests/test_spawn_dash.py
+pytest tests/test_spawn_ui.py
+pytest tests/test_mysql55.py
+```
+
+MySQL 통합:
+
+```bash
+AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
+python -m pytest tests/test_mysql_spawn_queue_integration.py
+```
+
+## 22. 자주 나는 문제
+
+### pending에서 멈춤
+
+확인:
+
+```text
+server_name이 AIA 요청과 Java poller에서 같은가?
+AiaRobotSpawnPoller.runOnce()가 호출되는가?
+DB 계정이 aia_robot_spawn_request update 권한을 갖는가?
+```
+
+### claimed에서 멈춤
+
+Adapter에서 예외가 나거나 서버가 중간 종료된 경우입니다.
+
+```http
+POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
+```
+
+### failed가 발생
+
+GUI에서 `last_error`를 확인합니다.
+
+```http
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
+```
+
+대부분 아래 원인입니다.
+
+```text
+중복 이름
+IdFactory 미초기화
+맵 좌표 오류
+DB insert 컬럼 누락
+World 등록 전 객체 필드 부족
+AI scheduler 등록 실패
+```
+
+### 로봇은 생성됐는데 움직이지 않음
+
+확인:
+
+```text
+AI scheduler 등록 여부
+tick loop 실행 여부
+ops-tick 호출 여부
+AIA 응답 action 파싱 여부
+서버 최종 검증에서 막히는지 여부
+```
+
+## 23. 현재 AIA 공식 파일 구조
 
 ```text
 app/models/req.py
@@ -360,43 +819,4 @@ app/services/spawn.py
 app/services/spawn_dash.py
 app/services/autonomy.py
 app/ui/spawn_queue.py
-```
-
-## 17. 테스트
-
-전체 품질 게이트:
-
-```bash
-python runners/quality/run_quality_gates.py
-```
-
-주요 개별 테스트:
-
-```bash
-pytest tests/test_mods.py
-pytest tests/test_auto_live.py
-pytest tests/test_spawn_api.py
-pytest tests/test_spawn_dash.py
-pytest tests/test_spawn_ui.py
-pytest tests/test_mysql55.py
-```
-
-선택형 MySQL 통합 테스트:
-
-```bash
-AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
-python -m pytest tests/test_mysql_spawn_queue_integration.py
-```
-
-Smoke 테스트:
-
-```bash
-python runners/smoke/ops_tick_smoke.py
-python runners/smoke/robot_crud_smoke.py
-```
-
-Windows 전체 점검:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
 ```
