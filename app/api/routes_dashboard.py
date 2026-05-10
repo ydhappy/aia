@@ -8,13 +8,13 @@ from app.models.dashboard_models import (
     RobotAiOpsDashboardResponse,
     ShardAssignmentResponse,
 )
+from app.services.autonomy import robot_autonomy_baseline_service
 from app.services.dashboard_service import dashboard_service
 from app.services.rebalance_service import rebalance_service
-from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.server_context_service import server_context_service
 from app.services.shard_balancer_service import shard_balancer_service
-from app.services.spawn_request_dashboard_service import spawn_request_dashboard_service
+from app.services.spawn_dash import spawn_request_dashboard_service
 from app.services.world_profile_service import world_profile_service
 from app.services.world_profile_validator import world_profile_validator
 
