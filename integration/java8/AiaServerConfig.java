@@ -11,6 +11,7 @@ public class AiaServerConfig {
     private String jdbcUrl = "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8";
     private String dbUser = "root";
     private String dbPassword = "";
+    private String dbDialect = "auto";
     private String serverName = "main";
     private int spawnBatchSize = 20;
     private int connectTimeoutMs = 3000;
@@ -48,6 +49,7 @@ public class AiaServerConfig {
         config.setJdbcUrl(text(props, "aia.jdbcUrl", config.getJdbcUrl()));
         config.setDbUser(text(props, "aia.dbUser", config.getDbUser()));
         config.setDbPassword(text(props, "aia.dbPassword", config.getDbPassword()));
+        config.setDbDialect(text(props, "aia.dbDialect", config.getDbDialect()));
         config.setServerName(text(props, "aia.serverName", config.getServerName()));
         config.setSpawnBatchSize(number(props, "aia.spawnBatchSize", config.getSpawnBatchSize(), 1, 500));
         config.setConnectTimeoutMs(number(props, "aia.connectTimeoutMs", config.getConnectTimeoutMs(), 100, 60000));
@@ -102,6 +104,15 @@ public class AiaServerConfig {
         return this;
     }
 
+    public String getDbDialect() {
+        return dbDialect;
+    }
+
+    public AiaServerConfig setDbDialect(String dbDialect) {
+        this.dbDialect = clean(dbDialect, "auto").toLowerCase();
+        return this;
+    }
+
     public String getServerName() {
         return serverName;
     }
@@ -145,6 +156,13 @@ public class AiaServerConfig {
     public AiaServerConfig setHealthCheckBeforeSpawn(boolean healthCheckBeforeSpawn) {
         this.healthCheckBeforeSpawn = healthCheckBeforeSpawn;
         return this;
+    }
+
+    public AiaSpawnQueueSql createSpawnQueueSql() {
+        if ("auto".equals(dbDialect)) {
+            return AiaSpawnQueueSql.forJdbcUrl(jdbcUrl);
+        }
+        return AiaSpawnQueueSql.forDialect(dbDialect);
     }
 
     public void validate() {
