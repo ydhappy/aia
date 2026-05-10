@@ -23,7 +23,7 @@ AIA
 
 ## 왜 이 구조인가
 
-기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`를 통해 기존 서버 코드가 직접 생성하게 합니다.
+기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`와 `AiaRobotActionAdapter`를 통해 기존 서버 코드가 직접 생성/실행하게 합니다.
 
 이 방식의 장점:
 
@@ -122,9 +122,10 @@ POST /robot/spawn-requests
 
 ```text
 integration/java8/aia-server.properties.example -> config/aia-server.properties
+integration/java8/aia-robot-template.properties.example -> config/aia-robot-template.properties
 ```
 
-수정할 값:
+`aia-server.properties`는 AIA URL, API key, DB, serverName, timeout을 담당합니다.
 
 ```properties
 aia.baseUrl=http://127.0.0.1:8000
@@ -139,6 +140,16 @@ aia.connectTimeoutMs=3000
 aia.readTimeoutMs=5000
 ```
 
+`aia-robot-template.properties`는 서버별 classId, 기본 아이템, 기본 스킬, HP/MP 기본값을 담당합니다.
+
+```properties
+aia.class.knight=1
+aia.class.elf=2
+aia.class.wizard=3
+aia.item.knight=1,23,40010,40011
+aia.skill.wizard=6,7,8
+```
+
 ### 7. 기존 게임서버에 붙일 Java 파일
 
 아래 파일을 기존 게임서버 소스에 복사합니다.
@@ -147,11 +158,16 @@ aia.readTimeoutMs=5000
 integration/java8/LocalAiaClient.java
 integration/java8/AiaServerConfig.java
 integration/java8/AiaServerConnector.java
+integration/java8/AiaRobotTemplateConfig.java
 integration/java8/aia-server.properties.example
+integration/java8/aia-robot-template.properties.example
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
+integration/java8/AiaDecision.java
 integration/java8/AiaDecisionParser.java
+integration/java8/AiaRobotActionAdapter.java
+integration/java8/AiaRobotActionRunner.java
 integration/java8/DbDecisionPoller.java
 ```
 
@@ -159,6 +175,7 @@ integration/java8/DbDecisionPoller.java
 
 ```java
 private static AiaServerConnector aiaConnector;
+private static AiaRobotActionRunner actionRunner;
 
 private void bootAiaRobots() throws Exception {
     aiaConnector = AiaServerConnector.fromFile(
@@ -166,6 +183,7 @@ private void bootAiaRobots() throws Exception {
         new MyServerAiaRobotAdapter()
     );
     int processed = aiaConnector.bootSpawnOnce();
+    actionRunner = new AiaRobotActionRunner(aiaConnector, new MyServerAiaRobotActionAdapter());
     System.out.println("[AIA] spawn processed=" + processed);
 }
 ```
@@ -182,7 +200,7 @@ private void bootAiaRobots() throws Exception {
 
 ## 기존 서버에서 반드시 작성해야 하는 코드
 
-기존 게임서버 프로젝트 안에 서버 전용 Adapter를 만듭니다.
+### Spawn Adapter
 
 ```java
 public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
@@ -193,7 +211,7 @@ public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
     public long createAndSpawn(AiaRobotSpawnRequest request) throws Exception {
         // 1. 기존 서버 IdFactory로 objectId 발급
         // 2. 기존 서버 robot/character 테이블 insert
-        // 3. 기본 아이템/스킬 지급
+        // 3. config/aia-robot-template.properties 기반 아이템/스킬 지급
         // 4. request.locX / locY / locMap / heading 적용
         // 5. 기존 World에 로봇 객체 등록
         // 6. 기존 AI scheduler에 등록
@@ -207,16 +225,40 @@ public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
 }
 ```
 
-서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `CharacterTable`, `RobotTable`, `World`, `Inventory`, `Skill`, `AI scheduler`에 연결해야 하는 위치를 보여주는 기준 코드입니다.
+### Action Adapter
+
+```java
+public class MyServerAiaRobotActionAdapter implements AiaRobotActionAdapter {
+    public String buildOpsTickJson(Object robot) throws Exception { return "{}"; }
+    public boolean canExecute(Object robot, AiaDecision decision) throws Exception { return true; }
+    public void move(Object robot, AiaDecision decision) throws Exception {}
+    public void attack(Object robot, AiaDecision decision) throws Exception {}
+    public void useSkill(Object robot, AiaDecision decision) throws Exception {}
+    public void retreat(Object robot, AiaDecision decision) throws Exception {}
+    public void pickup(Object robot, AiaDecision decision) throws Exception {}
+    public void idle(Object robot) throws Exception {}
+    public void onError(Object robot, Exception error) throws Exception { idle(robot); }
+}
+```
+
+서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `CharacterTable`, `RobotTable`, `World`, `Inventory`, `Skill`, `AI scheduler`, `move/attack/skill` 함수에 연결해야 하는 기준 코드입니다.
 
 ## AI tick에서 AIA 호출
 
-서버 로봇 AI loop에서는 connector를 재사용합니다.
+서버 로봇 AI loop에서는 action runner를 재사용합니다.
 
 ```java
-String json = buildOpsTickJson(robot);
-String response = aiaConnector.opsTick(json);
-// AiaDecisionParser로 파싱 후 서버 move/attack/skill 함수 실행
+actionRunner.tick(robot);
+```
+
+`AiaRobotActionRunner`가 내부에서 다음 순서로 처리합니다.
+
+```text
+buildOpsTickJson(robot)
+-> connector.opsTick(json)
+-> AiaDecisionParser.parseOpsTick(response)
+-> canExecute(robot, decision)
+-> move/attack/useSkill/retreat/pickup/idle 라우팅
 ```
 
 ## 운영 확인
