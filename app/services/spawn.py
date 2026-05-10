@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 
 from app.core.config import settings
 from app.core.mysql import connect_mysql
@@ -60,18 +61,21 @@ class RobotSpawnRequestService:
 
     def _row(self, request: RobotSpawnRequestCreateRequest, index: int, zone: dict, class_type: str) -> dict:
         profile = self._profile(class_type)
-        agent_id = "%s_%04d" % (self._safe_token(request.agent_prefix), index)
+        token = uuid.uuid4().hex[:10]
+        agent_id = ("%s_%s" % (self._safe_token(request.agent_prefix), token))[:64]
+        request_id = ("%s-%s" % (self._safe_token(request.request_prefix), token))[:64]
+        name = str(request.name_pool[index - 1]).strip()[:45]
         level = max(request.level_min, min(request.level_max, int(zone.get("min_level", request.level_min) or request.level_min)))
         x = int(zone.get("x", request.default_x) or request.default_x) + ((index % 5) - 2)
         y = int(zone.get("y", request.default_y) or request.default_y) + (((index // 5) % 5) - 2)
         map_id = int(zone.get("map_id", request.default_map) or request.default_map)
         metadata = dict(request.metadata or {})
-        metadata.update({"source": "aia_spawn_request_api", "created_by": "AIA", "created_at": int(time.time()), "hunt_zone_id": zone.get("id", "")})
+        metadata.update({"source": "aia_spawn_request_api", "created_by": "AIA", "created_at": int(time.time()), "hunt_zone_id": zone.get("id", ""), "name_policy": "name_pool_without_suffix"})
         return {
-            "request_id": ("%s-%s" % (self._safe_token(request.request_prefix), agent_id))[:64],
+            "request_id": request_id,
             "server_name": self._safe_token(request.server_name)[:64] or "main",
-            "agent_id": agent_id[:64],
-            "name": ("%s%04d" % (request.name_prefix[:30], index))[:45],
+            "agent_id": agent_id,
+            "name": name,
             "class_type": class_type[:20],
             "class_id": ClassId.BY_NAME.get(class_type, ClassId.KNIGHT),
             "level": level,
