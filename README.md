@@ -122,6 +122,8 @@ POST /robot/spawn-requests
 
 ```text
 integration/java8/LocalAiaClient.java
+integration/java8/AiaServerConfig.java
+integration/java8/AiaServerConnector.java
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
@@ -129,25 +131,24 @@ integration/java8/AiaDecisionParser.java
 integration/java8/DbDecisionPoller.java
 ```
 
-기존 서버의 시작 루틴에 poller를 연결합니다.
+권장 연결 방식은 `AiaServerConnector`입니다.
 
 ```java
+private static AiaServerConnector aiaConnector;
+
 private void bootAiaRobots() throws Exception {
-    LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "");
-    aia.setTimeouts(3000, 5000);
+    AiaServerConfig config = new AiaServerConfig()
+        .setAiaBaseUrl("http://127.0.0.1:8000")
+        .setApiKey("")
+        .setJdbcUrl("jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8")
+        .setDbUser("root")
+        .setDbPassword("password")
+        .setServerName("main")
+        .setSpawnBatchSize(20);
 
-    AiaRobotSpawnAdapter adapter = new MyServerAiaRobotAdapter();
-    AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
-        "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
-        "root",
-        "password",
-        "main",
-        aia,
-        adapter
-    );
-
-    poller.setBatchSize(20);
-    poller.runOnce();
+    aiaConnector = new AiaServerConnector(config, new MyServerAiaRobotAdapter());
+    int processed = aiaConnector.bootSpawnOnce();
+    System.out.println("[AIA] spawn processed=" + processed);
 }
 ```
 
@@ -189,6 +190,16 @@ public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
 ```
 
 서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `CharacterTable`, `RobotTable`, `World`, `Inventory`, `Skill`, `AI scheduler`에 연결해야 하는 위치를 보여주는 기준 코드입니다.
+
+## AI tick에서 AIA 호출
+
+서버 로봇 AI loop에서는 connector를 재사용합니다.
+
+```java
+String json = buildOpsTickJson(robot);
+String response = aiaConnector.opsTick(json);
+// AiaDecisionParser로 파싱 후 서버 move/attack/skill 함수 실행
+```
 
 ## 운영 확인
 
