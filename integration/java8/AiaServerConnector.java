@@ -38,19 +38,30 @@ public class AiaServerConnector {
     }
 
     public int bootSpawnOnce() throws Exception {
+        return bootSpawnOnce(createQueueFromConfig());
+    }
+
+    public int bootSpawnOnce(AiaSpawnQueue queue) throws Exception {
         if (config.isHealthCheckBeforeSpawn() && !aiaClient.healthCheck()) {
             throw new IllegalStateException("AIA health check failed: " + config.getAiaBaseUrl());
         }
         AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
-                config.getJdbcUrl(),
-                config.getDbUser(),
-                config.getDbPassword(),
+                queue,
                 config.getServerName(),
                 aiaClient,
                 spawnAdapter
         );
         poller.setBatchSize(config.getSpawnBatchSize());
         return poller.runOnce();
+    }
+
+    public AiaSpawnQueue createQueueFromConfig() {
+        return new JdbcAiaSpawnQueue(
+                config.getJdbcUrl(),
+                config.getDbUser(),
+                config.getDbPassword(),
+                config.createSpawnQueueSql()
+        );
     }
 
     public String opsTick(String json) throws Exception {
