@@ -1,0 +1,40 @@
+# AIA robot template settings
+# Copy this file to your game server config directory, for example:
+#   config/aia-robot-template.properties
+
+# Class id mapping. Change these values to match your game server.
+aia.class.royal=0
+aia.class.knight=1
+aia.class.elf=2
+aia.class.wizard=3
+aia.class.default=1
+
+# Optional name prefixes. AIA spawn request name is still the primary value.
+aia.namePrefix.default=AIA
+aia.namePrefix.knight=AIA기사
+aia.namePrefix.elf=AIA요정
+aia.namePrefix.wizard=AIA마법사
+
+# Spawn HP/MP fallback values. Existing server formulas may override these.
+aia.hp.default=100
+aia.hp.knight=160
+aia.hp.elf=120
+aia.hp.wizard=80
+
+aia.mp.default=30
+aia.mp.knight=20
+aia.mp.elf=60
+aia.mp.wizard=120
+
+# Basic item ids. Change to match your server item table.
+# Comma-separated integer ids. Malformed ids are ignored.
+aia.item.default=40010,40011
+aia.item.knight=1,23,40010,40011
+aia.item.elf=4,37,40010,40011
+aia.item.wizard=7,51,40010,40011
+
+# Basic skill ids. Change to match your server skill table.
+aia.skill.default=
+aia.skill.knight=1,2
+aia.skill.elf=3,4,5
+aia.skill.wizard=6,7,8
