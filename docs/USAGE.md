@@ -14,8 +14,7 @@ AIA
 기존 게임서버
   - queue에서 pending 요청 poll
   - 서버 IdFactory로 objectId 발급
-  - 서버 DB에 robot/character insert
-  - inventory/skill 지급
+  - 서버 DB에 robot/robot_item/robot_skill insert
   - World에 객체 등록
   - AI scheduler 등록
   - tick마다 AIA에 상태 전송 후 판단 수신
@@ -28,15 +27,16 @@ AIA
 1. AIA 설치
 2. .env 설정
 3. MySQL 5.5 SQL 적용
-4. AIA 실행
-5. POST /robot/spawn-requests로 생성 요청 적재
-6. 기존 게임서버에 integration/java8 파일 복사
-7. aia-server.properties와 aia-robot-template.properties를 서버 config에 복사 후 수정
-8. 기존 서버 시작 루틴에 AiaServerConnector.fromFile() 연결
-9. 기존 서버 코드에 MyServerAiaRobotAdapter 구현
-10. 기존 서버 코드에 MyServerAiaRobotActionAdapter 구현
-11. 기존 로봇 AI tick 또는 NPC/robot update loop에서 AiaRobotActionRunner.tick(robot) 호출
-12. dashboard로 pending/failed/done 상태 확인
+4. 서버에 로봇 테이블이 없다면 sql/robot_min_mysql55.sql 적용
+5. AIA 실행
+6. POST /robot/spawn-requests로 생성 요청 적재
+7. 기존 게임서버에 integration/java8 파일 복사
+8. aia-server.properties와 aia-robot-template.properties를 서버 config에 복사 후 수정
+9. 기존 서버 시작 루틴에 AiaServerConnector.fromFile() 연결
+10. 기존 서버 코드에 MyServerAiaRobotAdapter 또는 BasicRobotAdapter 기반 Adapter 구현
+11. 기존 서버 코드에 MyServerAiaRobotActionAdapter 구현
+12. 기존 로봇 AI tick 또는 NPC/robot update loop에서 AiaRobotActionRunner.tick(robot) 호출
+13. dashboard로 pending/failed/done 상태 확인
 ```
 
 ## 3. AIA 설치
@@ -77,9 +77,27 @@ Java 쪽 `config/aia-server.properties`의 `aia.apiKey`에도 같은 값을 넣�
 
 ## 5. MySQL 5.5 SQL 적용
 
+기본 AIA 테이블:
+
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
+```
+
+서버에 로봇 테이블이 전혀 없다면 추가 적용:
+
+```bash
+mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
+```
+
+생성되는 최소 로봇 테이블:
+
+```text
+robot
+robot_item
+robot_skill
+robot_ai
+robot_log
 ```
 
 확인:
@@ -137,6 +155,11 @@ integration/java8/AiaDecision.java
 integration/java8/AiaDecisionParser.java
 integration/java8/AiaRobotActionAdapter.java
 integration/java8/AiaRobotActionRunner.java
+integration/java8/AiaSpawnQueue.java
+integration/java8/JdbcAiaSpawnQueue.java
+integration/java8/AiaSpawnQueueSql.java
+integration/java8/RobotStore.java
+integration/java8/BasicRobotAdapter.java
 integration/java8/DbDecisionPoller.java
 ```
 
@@ -157,6 +180,7 @@ aia.apiKey=
 aia.jdbcUrl=jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8
 aia.dbUser=root
 aia.dbPassword=password
+aia.dbDialect=auto
 aia.serverName=main
 aia.spawnBatchSize=20
 aia.healthCheckBeforeSpawn=true
@@ -209,6 +233,8 @@ GameServer.start()
 import integration.java8.AiaRobotActionRunner;
 import integration.java8.AiaRobotTemplateConfig;
 import integration.java8.AiaServerConnector;
+import integration.java8.BasicRobotAdapter;
+import integration.java8.RobotStore;
 
 public final class MyServerAiaBootstrap {
     private static AiaServerConnector connector;
@@ -221,10 +247,21 @@ public final class MyServerAiaBootstrap {
     public static void bootOnce() {
         try {
             template = AiaRobotTemplateConfig.fromFile("config/aia-robot-template.properties");
-            connector = AiaServerConnector.fromFile(
-                    "config/aia-server.properties",
-                    new MyServerAiaRobotAdapter(template)
+            RobotStore store = new RobotStore(
+                    "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
+                    "root",
+                    "password"
             );
+            BasicRobotAdapter adapter = new BasicRobotAdapter(
+                    store,
+                    template,
+                    new BasicRobotAdapter.ObjectIdProvider() {
+                        public long nextObjectId() throws Exception {
+                            return IdFactory.getInstance().nextId();
+                        }
+                    }
+            );
+            connector = AiaServerConnector.fromFile("config/aia-server.properties", adapter);
             int processed = connector.bootSpawnOnce();
             actionRunner = new AiaRobotActionRunner(connector, new MyServerAiaRobotActionAdapter());
             System.out.println("[AIA] spawned or processed robots=" + processed);
@@ -272,70 +309,46 @@ public class GameServer {
 
 ## 13. Spawn Adapter 구현
 
+서버에 로봇 구조가 이미 있으면 직접 구현합니다.
+
 ```java
-import integration.java8.AiaRobotSpawnAdapter;
-import integration.java8.AiaRobotSpawnRequest;
-import integration.java8.AiaRobotTemplateConfig;
-
 public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
-    private final AiaRobotTemplateConfig template;
-
-    public MyServerAiaRobotAdapter(AiaRobotTemplateConfig template) {
-        this.template = template;
-    }
-
     public boolean exists(AiaRobotSpawnRequest request) throws Exception {
-        if (request == null) return true;
-        if (CharacterTable.getInstance().doesCharNameExist(request.name)) return true;
-        return RobotTable.getInstance().findByAgentId(request.agentId) != null;
+        return false;
     }
 
     public long createAndSpawn(AiaRobotSpawnRequest request) throws Exception {
-        int objectId = IdFactory.getInstance().nextId();
-        int serverClassId = template.classId(request.classType, request.classId);
-
-        L1RobotInstance robot = new L1RobotInstance();
-        robot.setId(objectId);
-        robot.setName(request.name);
-        robot.setLevel(request.level);
-        robot.setClassId(serverClassId);
-        robot.setX(request.locX);
-        robot.setY(request.locY);
-        robot.setMap((short) request.locMap);
-        robot.setHeading(request.heading);
-        robot.setAgentId(request.agentId);
-
-        CharacterTable.getInstance().storeNewCharacter(robot);
-        RobotTable.getInstance().insert(robot);
-
-        giveItems(robot, template.items(request.classType));
-        giveSkills(robot, template.skills(request.classType));
-
-        L1World.getInstance().storeObject(robot);
-        L1World.getInstance().addVisibleObject(robot);
-        RobotAiScheduler.getInstance().register(robot);
-        return objectId;
+        // 1. 기존 서버 IdFactory로 objectId 발급
+        // 2. 기존 서버 robot/character 테이블 insert
+        // 3. config/aia-robot-template.properties 기반 아이템/스킬 지급
+        // 4. request.locX / locY / locMap / heading 적용
+        // 5. 기존 World에 로봇 객체 등록
+        // 6. 기존 AI scheduler에 등록
+        // 7. objectId 반환
+        return 0L;
     }
 
     public void afterSpawn(AiaRobotSpawnRequest request, long serverObjectId) throws Exception {
-        System.out.println("[AIA] spawned robot name=" + request.name + " objectId=" + serverObjectId);
-    }
-
-    private void giveItems(L1RobotInstance robot, int[] itemIds) throws Exception {
-        for (int i = 0; i < itemIds.length; i++) {
-            RobotInventoryFactory.giveItem(robot, itemIds[i], 1);
-        }
-    }
-
-    private void giveSkills(L1RobotInstance robot, int[] skillIds) throws Exception {
-        for (int i = 0; i < skillIds.length; i++) {
-            RobotSkillFactory.giveSkill(robot, skillIds[i]);
-        }
     }
 }
 ```
 
-위 예시는 서버 함수명에 맞춰 바꿔야 합니다.
+서버에 로봇 구조가 전혀 없으면 `BasicRobotAdapter`로 시작하고, `afterCreateRows()`를 override해서 실제 World 등록만 붙입니다.
+
+```java
+public class MyRobotAdapter extends BasicRobotAdapter {
+    public MyRobotAdapter(RobotStore store, AiaRobotTemplateConfig template, ObjectIdProvider provider) {
+        super(store, template, provider);
+    }
+
+    protected void afterCreateRows(AiaRobotSpawnRequest request, long robotUid, long objectId) throws Exception {
+        // 1. 메모리 로봇 객체 생성
+        // 2. request 좌표/레벨/클래스 적용
+        // 3. World 등록
+        // 4. AI scheduler 등록
+    }
+}
+```
 
 ## 14. Action Adapter 구현
 
@@ -345,89 +358,24 @@ import integration.java8.AiaRobotActionAdapter;
 
 public class MyServerAiaRobotActionAdapter implements AiaRobotActionAdapter {
     public String buildOpsTickJson(Object robotObj) throws Exception {
-        L1RobotInstance robot = (L1RobotInstance) robotObj;
-        return "{"
-            + "\"observe\":{"
-            + "\"agent_id\":\"" + robot.getAgentId() + "\","
-            + "\"tick\":" + System.currentTimeMillis() + ","
-            + "\"state\":{"
-            + "\"hp\":" + robot.getCurrentHp() + ","
-            + "\"mp\":" + robot.getCurrentMp() + ","
-            + "\"x\":" + robot.getX() + ","
-            + "\"y\":" + robot.getY() + ","
-            + "\"map_id\":" + robot.getMapId() + ","
-            + "\"target_id\":" + jsonString(robot.getTargetId()) + ","
-            + "\"target_distance\":" + robot.getTargetDistance() + ","
-            + "\"is_under_attack\":" + robot.isUnderAttack() + ","
-            + "\"nearby_enemies\":" + robot.countNearbyEnemies() + ","
-            + "\"nearby_allies\":" + robot.countNearbyAllies() + ","
-            + "\"safe_zone\":" + robot.isSafetyZone() + ","
-            + "\"can_teleport\":" + robot.canTeleport() + ","
-            + "\"must_use_hp_item\":" + (robot.getCurrentHpPercent() < 35) + ","
-            + "\"weight_percent\":" + robot.getWeightPercent()
-            + "}"
-            + "},"
-            + "\"include_dashboard\":false"
-            + "}";
+        return "{}";
     }
 
     public boolean canExecute(Object robotObj, AiaDecision decision) throws Exception {
-        L1RobotInstance robot = (L1RobotInstance) robotObj;
-        if (decision == null) return false;
-        if (robot.isDead()) return false;
-        if ("ATTACK".equals(decision.getAction()) && robot.getTarget() == null) return false;
-        if ("USE_SKILL".equals(decision.getAction()) && robot.isSkillDelay()) return false;
-        return true;
+        return decision != null;
     }
 
-    public void move(Object robot, AiaDecision decision) throws Exception {
-        robotMoveService.move((L1RobotInstance) robot, decision.getActionArgsJson());
-    }
-
-    public void attack(Object robot, AiaDecision decision) throws Exception {
-        robotAttackService.attack((L1RobotInstance) robot, decision.getActionArgsJson());
-    }
-
-    public void useSkill(Object robot, AiaDecision decision) throws Exception {
-        robotSkillService.useSkill((L1RobotInstance) robot, decision.getActionArgsJson());
-    }
-
-    public void retreat(Object robot, AiaDecision decision) throws Exception {
-        robotMoveService.returnHome((L1RobotInstance) robot);
-    }
-
-    public void pickup(Object robot, AiaDecision decision) throws Exception {
-        robotItemService.pickupNearby((L1RobotInstance) robot);
-    }
-
-    public void idle(Object robot) throws Exception {
-        ((L1RobotInstance) robot).doIdle();
-    }
-
-    public void onError(Object robot, Exception error) throws Exception {
-        idle(robot);
-    }
-
-    private String jsonString(Object value) {
-        if (value == null) return "null";
-        return "\"" + String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-    }
+    public void move(Object robot, AiaDecision decision) throws Exception {}
+    public void attack(Object robot, AiaDecision decision) throws Exception {}
+    public void useSkill(Object robot, AiaDecision decision) throws Exception {}
+    public void retreat(Object robot, AiaDecision decision) throws Exception {}
+    public void pickup(Object robot, AiaDecision decision) throws Exception {}
+    public void idle(Object robot) throws Exception {}
+    public void onError(Object robot, Exception error) throws Exception { idle(robot); }
 }
 ```
 
 ## 15. 로봇 AI tick에 연결
-
-기존 서버의 로봇 AI loop 위치:
-
-```text
-RobotAI.run()
-RobotController.tick()
-RobotInstance.onAiTick()
-NpcAIThread.run()
-GeneralThreadPool scheduled task
-```
-
-기존 tick 안에 아래 한 줄을 넣습니다.
 
 ```java
 AiaRobotActionRunner runner = MyServerAiaBootstrap.getActionRunner();
@@ -436,8 +384,6 @@ if (runner != null) {
     return;
 }
 ```
-
-AIA 장애 시에는 `AiaRobotActionRunner`가 `adapter.onError()`를 호출하고, 보통 `idle()` 또는 기존 AI fallback으로 빠지게 작성합니다.
 
 ## 16. 실패/복구 확인
 
