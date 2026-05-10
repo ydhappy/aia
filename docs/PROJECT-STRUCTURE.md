@@ -7,6 +7,7 @@ AIA는 순수 코드와 실행 코드를 분리합니다.
 ```text
 app/                 Python 애플리케이션 코드
 app/core/            설정, 보안, DB 연결, 공통 명칭 상수
+app/services/        서비스 로직. 새 코드는 짧은 모듈명을 우선 사용
 app/ui/              짧은 UI 렌더러
 sql/                 MySQL 5.5 호환 SQL
 integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
@@ -30,7 +31,10 @@ runners/quality/     품질 게이트 실행
 ```text
 app/core/names.py       테이블명, 상태명, SQL 파일명, 클래스 ID
 app/core/live_json.py   운영 JSON 파일 실시간 reload helper
-app/ui/spawn_queue.py   Spawn Queue GUI 렌더러
+app/services/spawn.py       로봇 생성 요청 서비스 공식 경로
+app/services/spawn_dash.py  Spawn Queue 대시보드 서비스 공식 경로
+app/services/autonomy.py    로봇 자율운영 설정 서비스 공식 경로
+app/ui/spawn_queue.py       Spawn Queue GUI 렌더러
 ```
 
 운영 JSON 파일은 `LiveJsonFile` 기준으로 파일 수정 시간이 바뀌면 다음 요청에서 다시 읽는 구조를 사용합니다.
@@ -82,3 +86,4 @@ build/java8-classes/
 - 예제/샘플 전용 코드는 유지하지 않습니다.
 - 반복 문자열은 `app/core/names.py`에 모읍니다.
 - 화면 파일명은 짧고 목적 중심으로 둡니다.
+- 새 코드에서는 `robot_spawn_request_service.py`, `spawn_request_dashboard_service.py`, `robot_autonomy_baseline_service.py` 같은 긴 경로 대신 `spawn.py`, `spawn_dash.py`, `autonomy.py`를 사용합니다.
