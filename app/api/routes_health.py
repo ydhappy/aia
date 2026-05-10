@@ -2,18 +2,10 @@ from fastapi import APIRouter
 
 from app.core.config import settings
 from app.core.mysql import connect_mysql
+from app.core.names import SqlFile, Table
 from app.models.response_models import HealthResponse
 from app.services.llm_client import llm_client
 
-
-SPAWN_QUEUE_TABLE = "aia_robot_spawn_request"
-DB_BRIDGE_TABLES = [
-    "aia_robot_state",
-    "aia_robot_event",
-    "aia_robot_feedback",
-    "aia_robot_decision",
-    "aia_robot_trace_summary",
-]
 
 router = APIRouter(tags=["health"])
 
@@ -86,7 +78,7 @@ def _mysql_health() -> dict:
             "enabled": True,
             "status": "error",
             "reason": str(exc),
-            "missing_tables": [SPAWN_QUEUE_TABLE] + DB_BRIDGE_TABLES,
+            "missing_tables": Table.ALL,
             "tables": _fallback_table_status(False),
         }
 
@@ -113,7 +105,7 @@ def _fallback_table_status(exists: bool) -> dict:
 
 
 def _required_tables() -> dict[str, str]:
-    result = {SPAWN_QUEUE_TABLE: "sql/aia_robot_spawn_request_mysql55.sql"}
-    for table_name in DB_BRIDGE_TABLES:
-        result[table_name] = "sql/aia_robot_schema.sql"
+    result = {Table.SPAWN: SqlFile.SPAWN}
+    for table_name in Table.BRIDGE:
+        result[table_name] = SqlFile.BRIDGE
     return result
