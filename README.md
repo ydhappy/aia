@@ -4,7 +4,7 @@ AIA는 기존 Java 게임서버 옆에 붙이는 **로봇 AI 브리지**입니�
 
 AIA가 게임서버의 원본 캐릭터/로봇 테이블을 직접 조작하지 않습니다. AIA는 로봇 생성 요청, 판단 API, 학습, 대시보드를 제공하고, 실제 로봇 생성과 월드 등록은 기존 게임서버가 직접 수행합니다.
 
-서버에 로봇 관련 코드/테이블이 전혀 없는 경우를 위해 최소 서버 로봇 테이블과 JDBC 저장소도 제공합니다.
+서버에 로봇 관련 코드/테이블이 전혀 없는 경우를 위해 최소 로봇 테이블과 JDBC 저장소도 제공합니다.
 
 ## 핵심 개념
 
@@ -25,23 +25,23 @@ AIA
 
 ## 서버에 로봇이 전혀 없는 경우
 
-최소 서버 소유 테이블을 먼저 적용합니다.
+최소 로봇 테이블을 먼저 적용합니다.
 
 ```bash
-mysql -u root -p your_game_db < sql/server_robot_minimal_mysql55.sql
+mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
 ```
 
-생성되는 서버 소유 테이블:
+생성되는 테이블:
 
 ```text
-server_robot
-server_robot_item
-server_robot_skill
-server_robot_ai_state
-server_robot_log
+robot
+robot_item
+robot_skill
+robot_ai
+robot_log
 ```
 
-이 테이블은 AIA 전용 테이블이 아니라 **기존 게임서버가 소유하는 최소 로봇 테이블**입니다. AIA는 여기에 직접 insert하지 않고, Java `MinimalServerRobotAdapter` 또는 서버 전용 Adapter가 `createAndSpawn()`에서 insert합니다.
+이 테이블은 AIA 전용 테이블이 아니라 **기존 게임서버가 소유하는 최소 로봇 테이블**입니다. AIA는 여기에 직접 insert하지 않고, Java `BasicRobotAdapter` 또는 서버 전용 Adapter가 `createAndSpawn()`에서 insert합니다.
 
 ## 왜 이 구조인가
 
@@ -107,7 +107,7 @@ mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 서버에 로봇 테이블이 없다면 추가 적용합니다.
 
 ```bash
-mysql -u root -p your_game_db < sql/server_robot_minimal_mysql55.sql
+mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
 ```
 
 MSSQL/PostgreSQL/SQLite를 queue DB로 쓰려면 `aia_robot_spawn_request`와 AIA bridge 테이블 DDL을 해당 DB 문법에 맞게 만들어야 합니다. Java 쪽 queue 처리는 `AiaSpawnQueue`/`JdbcAiaSpawnQueue`로 분리되어 있습니다.
@@ -217,8 +217,8 @@ integration/java8/AiaDecision.java
 integration/java8/AiaDecisionParser.java
 integration/java8/AiaRobotActionAdapter.java
 integration/java8/AiaRobotActionRunner.java
-integration/java8/ServerRobotStore.java
-integration/java8/MinimalServerRobotAdapter.java
+integration/java8/RobotStore.java
+integration/java8/BasicRobotAdapter.java
 integration/java8/DbDecisionPoller.java
 ```
 
@@ -230,16 +230,16 @@ private static AiaRobotActionRunner actionRunner;
 
 private void bootAiaRobots() throws Exception {
     AiaRobotTemplateConfig template = AiaRobotTemplateConfig.fromFile("config/aia-robot-template.properties");
-    ServerRobotStore store = new ServerRobotStore(
+    RobotStore store = new RobotStore(
         "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
         "root",
         "password"
     );
 
-    MinimalServerRobotAdapter adapter = new MinimalServerRobotAdapter(
+    BasicRobotAdapter adapter = new BasicRobotAdapter(
         store,
         template,
-        new MinimalServerRobotAdapter.ObjectIdProvider() {
+        new BasicRobotAdapter.ObjectIdProvider() {
             public long nextObjectId() throws Exception {
                 return IdFactory.getInstance().nextId();
             }
@@ -299,7 +299,7 @@ public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
 }
 ```
 
-서버에 로봇 구조가 전혀 없으면 `MinimalServerRobotAdapter`로 시작하고, `afterCreateDatabaseRows()`를 override해서 실제 World 등록만 붙입니다.
+서버에 로봇 구조가 전혀 없으면 `BasicRobotAdapter`로 시작하고, `afterCreateRows()`를 override해서 실제 World 등록만 붙입니다.
 
 ### Action Adapter
 
