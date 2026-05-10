@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
-from app.models.automation_models import (
+from app.models.auto import (
     AutomationDecisionResponse,
     AutomationTaskListResponse,
     AutomationTaskRequest,
