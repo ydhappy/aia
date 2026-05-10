@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
-from app.models.response_models import RobotEventResponse, RobotProfileResponse
-from app.models.unified_api_models import (
+from app.models.res import RobotEventResponse, RobotProfileResponse
+from app.models.uni import (
     AiaRobotOpsTickRequest,
     AiaRobotOpsTickResponse,
     UnifiedRobotSyncRequest,
@@ -10,7 +10,7 @@ from app.models.unified_api_models import (
 )
 from app.services.agent_service import agent_service
 from app.services.automation_service import automation_service
-from app.services.robot_autonomy_baseline_service import robot_autonomy_baseline_service
+from app.services.autonomy import robot_autonomy_baseline_service
 from app.services.learning_service import learning_service
 from app.services.robot_ai_ops_service import robot_ai_ops_service
 from app.services.store_factory import store
