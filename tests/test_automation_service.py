@@ -1,4 +1,4 @@
-from app.models.automation_models import AutomationTaskRequest
+from app.models.auto import AutomationTaskRequest
 from app.services.automation_service import automation_service
 
 
