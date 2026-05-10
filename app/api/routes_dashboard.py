@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 
 from app.core.security import verify_api_key
-from app.models.dashboard_models import (
+from app.models.dash import (
     AgentFilterResult,
     DashboardCountsResponse,
     RobotAiOpsDashboardResponse,
