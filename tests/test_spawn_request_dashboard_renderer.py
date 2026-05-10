@@ -1,8 +1,8 @@
-from app.services.spawn_request_dashboard_renderer import render_spawn_queue_html
+from app.ui.spawn_queue import render_spawn_queue
 
 
 def test_spawn_queue_renderer_escapes_row_values_and_renders_actions() -> None:
-    html = render_spawn_queue_html(
+    html = render_spawn_queue(
         {
             "enabled": True,
             "reason": "",
