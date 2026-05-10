@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.core.config import settings
 from app.core.mysql import connect_mysql
 from app.core.names import SqlFile, Table
-from app.models.response_models import HealthResponse
+from app.models.res import HealthResponse
 from app.services.llm_client import llm_client
 
 
