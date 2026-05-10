@@ -1,0 +1,102 @@
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+AllowedAction = Literal["MOVE", "ATTACK", "USE_SKILL", "RETREAT", "PICKUP", "IDLE"]
+
+
+class ObserveResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    tick: int
+    message: str = "state stored"
+
+
+class DecideResponse(BaseModel):
+    action: AllowedAction
+    action_args: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str
+    source: Literal["rule_engine", "llm", "fallback"] = "rule_engine"
+
+
+class HealthResponse(BaseModel):
+    app: str
+    status: str
+    llm_backend: str
+    llm_status: str
+    state_store: str
+
+
+class MetricsResponse(BaseModel):
+    total_observe_requests: int
+    total_decide_requests: int
+    total_fallbacks: int
+    total_profiles_saved: int
+    total_events_saved: int
+    total_learning_digests: int = 0
+    total_learning_records: int = 0
+    total_learning_issues: int = 0
+
+
+class RobotProfileResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot profile stored"
+
+
+class RobotEventResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot event stored"
+
+
+class RobotKnowledgeResponse(BaseModel):
+    agent_id: str
+    profile: dict[str, Any] = Field(default_factory=dict)
+    recent_events: list[dict[str, Any]] = Field(default_factory=list)
+    last_state: dict[str, Any] | None = None
+
+
+class RobotListResponse(BaseModel):
+    count: int = 0
+    agent_ids: list[str] = Field(default_factory=list)
+
+
+class RobotDeleteResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    deleted: bool
+    message: str = "robot data deleted"
+
+
+class AgentTraceResponse(BaseModel):
+    agent_id: str
+    trace: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotFeedbackResponse(BaseModel):
+    accepted: bool = True
+    agent_id: str
+    message: str = "robot feedback stored"
+
+
+class RobotLearningStateResponse(BaseModel):
+    agent_id: str
+    learning_state: dict[str, Any] = Field(default_factory=dict)
+
+
+class RobotLearningDigestResponse(BaseModel):
+    accepted: bool = True
+    processed_records: int = 0
+    processed_talk_memories: int = 0
+    delete_uids: list[int] = Field(default_factory=list)
+    delete_talk_keys: list[dict[str, Any]] = Field(default_factory=list)
+    issue_count: int = 0
+    issues: list[dict[str, Any]] = Field(default_factory=list)
+    learning_updates: int = 0
+    growth_updates: int = 0
+    talk_updates: int = 0
+    cleanup_policy: dict[str, Any] = Field(default_factory=dict)
+    message: str = "learning digest applied"
