@@ -24,13 +24,13 @@ def run_pytest() -> None:
         "tests/test_mods.py",
         "tests/test_health_details.py",
         "tests/test_live_json.py",
-        "tests/test_robot_autonomy_live_reload.py",
+        "tests/test_auto_live.py",
         "tests/test_mysql_helper.py",
         "tests/test_robot_crud_api.py",
-        "tests/test_robot_spawn_request_api.py",
-        "tests/test_spawn_request_dashboard.py",
-        "tests/test_spawn_request_dashboard_renderer.py",
-        "tests/test_mysql55_schema_compat.py",
+        "tests/test_spawn_api.py",
+        "tests/test_spawn_dash.py",
+        "tests/test_spawn_ui.py",
+        "tests/test_mysql55.py",
     ]
     for target in focused:
         run([PYTHON, "-m", "pytest", target])
