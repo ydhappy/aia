@@ -8,7 +8,7 @@ AIA가 게임서버의 원본 캐릭터/로봇 테이블을 직접 조작하지 
 
 ```text
 AIA
-  -> 로봇 생성 요청을 MySQL queue에 저장
+  -> 로봇 생성 요청을 queue에 저장
   -> 로봇 profile/판단/학습/API/dashboard 제공
 
 기존 게임서버
@@ -23,7 +23,7 @@ AIA
 
 ## 왜 이 구조인가
 
-기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`와 `AiaRobotActionAdapter`를 통해 기존 서버 코드가 직접 생성/실행하게 합니다.
+기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`, `AiaRobotActionAdapter`, `AiaSpawnQueue`를 통해 기존 서버 코드가 직접 생성/실행/큐처리를 하게 합니다.
 
 이 방식의 장점:
 
@@ -33,6 +33,7 @@ AIA
 서버별 DB schema 차이 흡수
 월드 객체/AI scheduler 정상 등록
 AIA 장애 시에도 게임서버 보호
+MySQL 외 DB는 AiaSpawnQueue 구현으로 확장 가능
 ```
 
 ## 빠른 시작
@@ -73,10 +74,14 @@ API_KEY=충분히_긴_랜덤_키
 
 ### 3. MySQL 5.5 SQL 적용
 
+기본 제공 SQL은 MySQL 5.5 기준입니다.
+
 ```bash
 mysql -u root -p your_game_db < sql/aia_robot_schema.sql
 mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 ```
+
+MSSQL/PostgreSQL/SQLite를 queue DB로 쓰려면 `aia_robot_spawn_request`와 AIA bridge 테이블 DDL을 해당 DB 문법에 맞게 만들어야 합니다. Java 쪽 queue 처리는 `AiaSpawnQueue`/`JdbcAiaSpawnQueue`로 분리되어 있습니다.
 
 확인:
 
@@ -125,7 +130,7 @@ integration/java8/aia-server.properties.example -> config/aia-server.properties
 integration/java8/aia-robot-template.properties.example -> config/aia-robot-template.properties
 ```
 
-`aia-server.properties`는 AIA URL, API key, DB, serverName, timeout을 담당합니다.
+`aia-server.properties`는 AIA URL, API key, queue DB, dialect, serverName, timeout을 담당합니다.
 
 ```properties
 aia.baseUrl=http://127.0.0.1:8000
@@ -133,11 +138,23 @@ aia.apiKey=
 aia.jdbcUrl=jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8
 aia.dbUser=root
 aia.dbPassword=password
+aia.dbDialect=auto
 aia.serverName=main
 aia.spawnBatchSize=20
 aia.healthCheckBeforeSpawn=true
 aia.connectTimeoutMs=3000
 aia.readTimeoutMs=5000
+```
+
+`aia.dbDialect` 값:
+
+```text
+auto
+mysql
+mariadb
+postgresql
+mssql
+sqlite
 ```
 
 `aia-robot-template.properties`는 서버별 classId, 기본 아이템, 기본 스킬, HP/MP 기본값을 담당합니다.
@@ -161,6 +178,9 @@ integration/java8/AiaServerConnector.java
 integration/java8/AiaRobotTemplateConfig.java
 integration/java8/aia-server.properties.example
 integration/java8/aia-robot-template.properties.example
+integration/java8/AiaSpawnQueue.java
+integration/java8/JdbcAiaSpawnQueue.java
+integration/java8/AiaSpawnQueueSql.java
 integration/java8/AiaRobotSpawnRequest.java
 integration/java8/AiaRobotSpawnAdapter.java
 integration/java8/AiaRobotSpawnPoller.java
@@ -186,6 +206,13 @@ private void bootAiaRobots() throws Exception {
     actionRunner = new AiaRobotActionRunner(aiaConnector, new MyServerAiaRobotActionAdapter());
     System.out.println("[AIA] spawn processed=" + processed);
 }
+```
+
+MySQL/MariaDB/PostgreSQL/MSSQL/SQLite 외 구조라면 `AiaSpawnQueue`를 직접 구현해서 아래처럼 주입할 수 있습니다.
+
+```java
+AiaSpawnQueue queue = new MyCustomSpawnQueue();
+int processed = aiaConnector.bootSpawnOnce(queue);
 ```
 
 넣는 위치:
