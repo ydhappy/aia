@@ -7,11 +7,15 @@
 aia.baseUrl=http://127.0.0.1:8000
 aia.apiKey=
 
-# Game DB that contains aia_robot_spawn_request.
+# Spawn queue DB that contains aia_robot_spawn_request.
 # MySQL 5.5 uses utf8, not utf8mb4.
 aia.jdbcUrl=jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8
 aia.dbUser=root
 aia.dbPassword=password
+
+# auto, mysql, mariadb, postgresql, mssql, sqlite.
+# auto detects from JDBC URL. Custom DBs can provide their own AiaSpawnQueue implementation.
+aia.dbDialect=auto
 
 # Must match POST /robot/spawn-requests server_name.
 aia.serverName=main
