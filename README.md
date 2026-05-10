@@ -4,7 +4,13 @@ AIA는 기존 Java 게임서버 옆에 붙이는 **로봇 AI 브리지**입니�
 
 AIA가 게임서버의 원본 캐릭터/로봇 테이블을 직접 조작하지 않습니다. AIA는 로봇 생성 요청, 판단 API, 학습, 대시보드를 제공하고, 실제 로봇 생성과 월드 등록은 기존 게임서버가 직접 수행합니다.
 
-서버에 로봇 관련 코드/테이블이 전혀 없는 경우를 위해 최소 로봇 테이블과 JDBC 저장소도 제공합니다.
+서버에 로봇 관련 코드/테이블이 전혀 없는 경우를 위해 최소 로봇 테이블, 기본 seed 데이터, JDBC 저장소도 제공합니다.
+
+초보자는 먼저 아래 문서를 그대로 따라가면 됩니다.
+
+```text
+docs/BEGINNER-SETUP.md
+```
 
 ## 핵심 개념
 
@@ -31,7 +37,15 @@ AIA
 mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
 ```
 
-생성되는 테이블:
+초보자 테스트용 기본 생성요청도 함께 넣을 수 있습니다.
+
+```bash
+mysql -u root -p your_game_db < sql/robot_seed_mysql55.sql
+```
+
+`robot_seed_mysql55.sql`은 `robot` 테이블에 직접 insert하지 않고, `aia_robot_spawn_request`에 `pending` 생성요청 6개를 넣습니다. 실제 `robot`, `robot_item`, `robot_skill`, `robot_ai`, `robot_log` row는 Java connector가 처리합니다.
+
+생성되는 최소 로봇 테이블:
 
 ```text
 robot
@@ -40,8 +54,6 @@ robot_skill
 robot_ai
 robot_log
 ```
-
-이 테이블은 AIA 전용 테이블이 아니라 **기존 게임서버가 소유하는 최소 로봇 테이블**입니다. AIA는 여기에 직접 insert하지 않고, Java `BasicRobotAdapter` 또는 서버 전용 Adapter가 `createAndSpawn()`에서 insert합니다.
 
 ## 왜 이 구조인가
 
@@ -110,6 +122,21 @@ mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
 mysql -u root -p your_game_db < sql/robot_min_mysql55.sql
 ```
 
+초보자 테스트용 기본 생성요청을 넣습니다.
+
+```bash
+mysql -u root -p your_game_db < sql/robot_seed_mysql55.sql
+```
+
+기본 seed 확인:
+
+```sql
+SELECT uid, request_id, server_name, agent_id, name, class_type, level, status
+FROM aia_robot_spawn_request
+WHERE request_id LIKE 'seed-main-%'
+ORDER BY uid;
+```
+
 MSSQL/PostgreSQL/SQLite를 queue DB로 쓰려면 `aia_robot_spawn_request`와 AIA bridge 테이블 DDL을 해당 DB 문법에 맞게 만들어야 합니다. Java 쪽 queue 처리는 `AiaSpawnQueue`/`JdbcAiaSpawnQueue`로 분리되어 있습니다.
 
 확인:
@@ -132,6 +159,8 @@ python runners/server/run_local_aia.py
 ```
 
 ### 5. 생성 요청 넣기
+
+API로 직접 생성요청을 넣을 수도 있습니다.
 
 ```http
 POST /robot/spawn-requests
@@ -268,7 +297,7 @@ int processed = aiaConnector.bootSpawnOnce(queue);
 유저 접속 오픈 전 또는 게임 루프 시작 직전
 ```
 
-자세한 위치와 Adapter 구현 예시는 `docs/USAGE.md`에 있습니다.
+자세한 위치와 Adapter 구현 예시는 `docs/USAGE.md`, 초보자용 전체 절차는 `docs/BEGINNER-SETUP.md`에 있습니다.
 
 ## 기존 서버에서 반드시 작성해야 하는 코드
 
@@ -404,6 +433,7 @@ python -m pytest tests/test_mysql_spawn_queue_integration.py
 ## 상세 문서
 
 ```text
+docs/BEGINNER-SETUP.md        초보자 완전 구성 가이드
 docs/USAGE.md                 실제 서버 연동 절차
 docs/SERVER-INTEGRATION.md    서버 연동 상세
 docs/API.md                   API 요약
