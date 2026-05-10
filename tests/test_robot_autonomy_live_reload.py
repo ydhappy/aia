@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.services.robot_autonomy_baseline_service import RobotAutonomyBaselineService
+from app.services.autonomy import RobotAutonomyBaselineService
 
 
 def test_robot_autonomy_service_uses_live_json_files(tmp_path: Path) -> None:
