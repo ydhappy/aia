@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from html import escape
+from urllib.parse import urlencode
 
 
 STATUS_ORDER = ["pending", "claimed", "done", "failed"]
@@ -10,14 +11,17 @@ def render_spawn_queue_html(data: dict) -> str:
     counts = data.get("counts", {}) or _empty_counts()
     rows = data.get("recent", []) or []
     status_filter = data.get("status_filter") or "all"
+    server_name_filter = str(data.get("server_name_filter") or "")
     total = int(data.get("total", 0) or 0)
     needs_attention = int(data.get("needs_attention", 0) or 0)
     enabled = bool(data.get("enabled"))
     reason = escape(str(data.get("reason", "")))
     operator_hint = escape(str(data.get("operator_hint", "")))
-    cards = _render_status_cards(counts)
+    cards = _render_status_cards(counts, server_name_filter)
     body_rows = "\n".join(_render_row(row) for row in rows) or "<tr><td colspan='13'>spawn request rows 없음</td></tr>"
     status_label = escape(str(status_filter))
+    server_label = escape(server_name_filter or "all")
+    server_input = escape(server_name_filter or "main")
     banner_class = "ok" if enabled and needs_attention == 0 else "warn"
     banner_text = "정상" if enabled and needs_attention == 0 else "확인 필요"
 
@@ -37,19 +41,21 @@ def render_spawn_queue_html(data: dict) -> str:
     <span class="badge">{escape(banner_text)}</span>
     <span>total={total}</span>
     <span>needs_attention={needs_attention}</span>
-    <span>현재 필터={status_label}</span>
+    <span>현재 상태 필터={status_label}</span>
+    <span>현재 서버 필터={server_label}</span>
   </section>
+  {_render_filter_box(server_input)}
   <div class="toolbar">
-    <a class="pill" href="?">전체</a>
-    <a class="pill" href="?status=pending">pending</a>
-    <a class="pill" href="?status=claimed">claimed</a>
-    <a class="pill" href="?status=done">done</a>
-    <a class="pill" href="?status=failed">failed</a>
+    <a class="pill" href="{_filter_url(None, server_name_filter)}">전체</a>
+    <a class="pill" href="{_filter_url('pending', server_name_filter)}">pending</a>
+    <a class="pill" href="{_filter_url('claimed', server_name_filter)}">claimed</a>
+    <a class="pill" href="{_filter_url('done', server_name_filter)}">done</a>
+    <a class="pill" href="{_filter_url('failed', server_name_filter)}">failed</a>
   </div>
   <p class="warn-text">{reason}</p>
   <p class="sub">{operator_hint}</p>
   <section class="cards">{cards}</section>
-  {_render_actions()}
+  {_render_actions(server_input)}
   <table>
     <thead>
       <tr>
@@ -66,18 +72,28 @@ def render_spawn_queue_html(data: dict) -> str:
 </html>"""
 
 
-def _render_actions() -> str:
-    return """
+def _render_filter_box(server_input: str) -> str:
+    return f"""
+  <section class="filterbox">
+    <b>서버 필터</b>
+    <label>server_name <input id="filterServer" value="{server_input}"></label>
+    <button type="button" onclick="applyServerFilter()">적용</button>
+    <button type="button" onclick="clearServerFilter()">전체 서버</button>
+  </section>"""
+
+
+def _render_actions(server_input: str) -> str:
+    return f"""
   <section class="actions">
     <div class="box">
       <b>failed 재시도</b>
-      <label>server <input id="retryServer" value="main"></label>
+      <label>server <input id="retryServer" value="{server_input}"></label>
       <label>limit <input id="retryLimit" value="50"></label>
       <button type="button" onclick="postAction('/dashboard/robot-spawn-queue/retry-failed','retryServer','retryLimit')">retry</button>
     </div>
     <div class="box">
       <b>claimed 복구</b>
-      <label>server <input id="recoverServer" value="main"></label>
+      <label>server <input id="recoverServer" value="{server_input}"></label>
       <label>min <input id="recoverMinutes" value="10"></label>
       <label>limit <input id="recoverLimit" value="50"></label>
       <button type="button" onclick="recoverClaimed()">recover</button>
@@ -85,14 +101,25 @@ def _render_actions() -> str:
   </section>"""
 
 
-def _render_status_cards(counts: dict) -> str:
+def _render_status_cards(counts: dict, server_name_filter: str) -> str:
     return "".join(
-        "<a class='card' href='?status={status}'><div>{status}</div><b>{count}</b></a>".format(
+        "<a class='card' href='{href}'><div>{status}</div><b>{count}</b></a>".format(
+            href=escape(_filter_url(status, server_name_filter)),
             status=escape(status),
             count=escape(str(int(counts.get(status, 0) or 0))),
         )
         for status in STATUS_ORDER
     )
+
+
+def _filter_url(status: str | None, server_name: str | None) -> str:
+    params: dict[str, str] = {}
+    if status:
+        params["status"] = status
+    if server_name:
+        params["server_name"] = server_name
+    query = urlencode(params)
+    return "?" + query if query else "?"
 
 
 def _render_row(row: dict) -> str:
@@ -142,9 +169,10 @@ a { color:inherit; text-decoration:none; }
 .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:20px 0; }
 .card { background:#182630; border:1px solid #2c4654; border-radius:14px; padding:16px; }
 .card b { display:block; margin-top:6px; font-size:28px; }
-.actions { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 24px; }
-.actions .box { display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#14222b; border:1px solid #2c4654; border-radius:14px; padding:10px; }
-input { background:#0a1117; color:#eef6f7; border:1px solid #385868; border-radius:8px; padding:7px; width:76px; }
+.actions, .filterbox { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 24px; align-items:center; }
+.actions .box, .filterbox { background:#14222b; border:1px solid #2c4654; border-radius:14px; padding:10px; }
+.actions .box { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+input { background:#0a1117; color:#eef6f7; border:1px solid #385868; border-radius:8px; padding:7px; width:120px; }
 table { width:100%; border-collapse:collapse; background:#14222b; border-radius:12px; overflow:hidden; }
 th,td { border-bottom:1px solid #2c4654; padding:9px; text-align:left; vertical-align:top; font-size:13px; }
 th { background:#203643; color:#cfe9ef; }
@@ -159,6 +187,12 @@ code { background:#0a1117; padding:2px 5px; border-radius:6px; }
 
 _SCRIPT = """
 function enc(id) { return encodeURIComponent(document.getElementById(id).value || ''); }
+function applyServerFilter() {
+  var server = enc('filterServer');
+  var query = server ? '?server_name=' + server : '?';
+  window.location.href = query;
+}
+function clearServerFilter() { window.location.href = '?'; }
 function postAction(path, serverId, limitId) {
   fetch(path + '?server_name=' + enc(serverId) + '&limit=' + enc(limitId), { method:'POST' })
     .then(r => r.json())
