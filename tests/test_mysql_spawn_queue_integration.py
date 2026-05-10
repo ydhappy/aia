@@ -37,6 +37,7 @@ def test_mysql_spawn_queue_create_retry_recover_and_health() -> None:
     settings.db_bridge_mysql_dsn = MYSQL_DSN
     prefix = "ci-%d" % int(time.time() * 1000)
     agent_prefix = "ci_robot_%d" % int(time.time())
+    other_prefix = prefix + "-other"
     try:
         with connect_mysql(MYSQL_DSN) as conn:
             with conn.cursor() as cur:
@@ -65,9 +66,27 @@ def test_mysql_spawn_queue_create_retry_recover_and_health() -> None:
         assert create_result["submitted"] == 2
         assert create_result["affected"] >= 2
 
-        summary = spawn_request_dashboard_service.summary(limit=10, status="pending")
+        other_result = robot_spawn_request_service.create_requests(
+            RobotSpawnRequestCreateRequest(
+                server_name="other-ci",
+                count=1,
+                request_prefix=other_prefix,
+                agent_prefix=agent_prefix + "_other",
+                classes=["wizard"],
+                level_min=1,
+                level_max=10,
+            )
+        )
+        assert other_result["accepted"] is True
+
+        summary = spawn_request_dashboard_service.summary(limit=10, status="pending", server_name="ci")
         assert summary["enabled"] is True
-        assert summary["counts"]["pending"] >= 2
+        assert summary["server_name_filter"] == "ci"
+        assert summary["counts"]["pending"] == 2
+        assert all(row["server_name"] == "ci" for row in summary["recent"])
+
+        unfiltered_summary = spawn_request_dashboard_service.summary(limit=10, status="pending")
+        assert unfiltered_summary["counts"]["pending"] >= 3
 
         with connect_mysql(MYSQL_DSN) as conn:
             with conn.cursor() as cur:
