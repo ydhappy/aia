@@ -1,44 +1,218 @@
 # AIA
 
-AIA는 게임서버 옆에서 실행되는 **Python 기반 로봇 AI 브리지**입니다.
+AIA는 기존 Java 게임서버 옆에 붙이는 **로봇 AI 브리지**입니다.
 
-게임서버는 실제 로봇 객체 생성, DB insert, 월드 등록, 이동, 공격, 스킬 실행을 담당합니다. AIA는 로봇 생성 요청 큐, 판단 API, 프로필, 학습, 대시보드를 담당합니다.
+AIA가 게임서버의 원본 캐릭터/로봇 테이블을 직접 조작하지 않습니다. AIA는 로봇 생성 요청, 판단 API, 학습, 대시보드를 제공하고, 실제 로봇 생성과 월드 등록은 기존 게임서버가 직접 수행합니다.
 
-원클릭 실행 방식과 예제/샘플 전용 코드는 제거했습니다. 현재 기준은 **서버 연동용 코드와 운영 문서만 유지**하는 구조입니다.
-
-## 핵심 구조
+## 핵심 개념
 
 ```text
-AIA HTTP API
-  -> MySQL 5.5 spawn queue
-  -> Java 8 AiaRobotSpawnPoller
-  -> 게임서버 AiaRobotSpawnAdapter 구현
-  -> 서버 IdFactory / DB insert / World spawn / AI scheduler
+AIA
+  -> 로봇 생성 요청을 MySQL queue에 저장
+  -> 로봇 profile/판단/학습/API/dashboard 제공
+
+기존 게임서버
+  -> queue에서 pending 요청 poll
+  -> 서버 IdFactory로 objectId 발급
+  -> 서버 DB insert
+  -> inventory/skill 지급
+  -> World spawn
+  -> AI scheduler 등록
+  -> tick마다 AIA ops-tick 호출
 ```
 
-AIA는 서버 원본 `robot`, `characters`, `robot_setting` 테이블을 직접 수정하지 않습니다.
+## 왜 이 구조인가
 
-## 폴더 구조
+기존 게임서버마다 objectId, character table, robot table, inventory, skill, world spawn, AI scheduler 구현이 다릅니다. 그래서 AIA가 서버 DB에 직접 insert하지 않고, `AiaRobotSpawnAdapter`를 통해 기존 서버 코드가 직접 생성하게 합니다.
+
+이 방식의 장점:
 
 ```text
-app/                 Python 애플리케이션 코드
-app/core/            설정, 보안, 공통 상수, live JSON loader
-app/models/          짧은 모델 파일(req/res/dash/uni/auto/batch)
-app/services/        서비스 로직(spawn/spawn_dash/autonomy 등)
-app/ui/              HTML UI 렌더러
-sql/                 MySQL 5.5 호환 SQL
-integration/java8/   게임서버에 붙일 Java 8 계약/클라이언트 코드
-runners/             사람이 직접 실행하는 실행 코드
-tests/               pytest 테스트
+서버 원본 구조 보존
+중복 objectId 방지
+서버별 DB schema 차이 흡수
+월드 객체/AI scheduler 정상 등록
+AIA 장애 시에도 게임서버 보호
 ```
 
-상세 구조:
+## 빠른 시작
+
+### 1. 설치
+
+```bash
+git clone <repo-url>
+cd aia
+python -m venv .venv
+python -m pip install -r requirements.txt
+```
+
+또는:
+
+```bash
+python runners/setup/bootstrap_local.py
+```
+
+### 2. `.env` 설정
+
+```env
+APP_ENV=local
+APP_HOST=127.0.0.1
+APP_PORT=8000
+ENABLE_API_KEY_AUTH=false
+DB_BRIDGE_BACKEND=mysql
+DB_BRIDGE_MYSQL_DSN=mysql+pymysql://root:password@127.0.0.1:3306/your_game_db
+STATE_STORE_MODE=memory
+```
+
+외부/LAN에 열 경우:
+
+```env
+ENABLE_API_KEY_AUTH=true
+API_KEY=충분히_긴_랜덤_키
+```
+
+### 3. MySQL 5.5 SQL 적용
+
+```bash
+mysql -u root -p your_game_db < sql/aia_robot_schema.sql
+mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
+```
+
+확인:
+
+```http
+GET /health/details
+```
+
+정상 기준:
 
 ```text
-docs/PROJECT-STRUCTURE.md
+mysql.status = ok
+mysql.missing_tables = []
 ```
 
-## 공식 짧은 파일명
+### 4. AIA 실행
+
+```bash
+python runners/server/run_local_aia.py
+```
+
+### 5. 생성 요청 넣기
+
+```http
+POST /robot/spawn-requests
+```
+
+```json
+{
+  "server_name": "main",
+  "count": 30,
+  "classes": ["knight", "elf", "wizard"],
+  "level_min": 1,
+  "level_max": 30,
+  "default_x": 32670,
+  "default_y": 32790,
+  "default_map": 4
+}
+```
+
+### 6. 기존 게임서버에 붙일 Java 파일
+
+아래 파일을 기존 게임서버 소스에 복사합니다.
+
+```text
+integration/java8/LocalAiaClient.java
+integration/java8/AiaRobotSpawnRequest.java
+integration/java8/AiaRobotSpawnAdapter.java
+integration/java8/AiaRobotSpawnPoller.java
+integration/java8/AiaDecisionParser.java
+integration/java8/DbDecisionPoller.java
+```
+
+기존 서버의 시작 루틴에 poller를 연결합니다.
+
+```java
+private void bootAiaRobots() throws Exception {
+    LocalAiaClient aia = new LocalAiaClient("http://127.0.0.1:8000", "");
+    aia.setTimeouts(3000, 5000);
+
+    AiaRobotSpawnAdapter adapter = new MyServerAiaRobotAdapter();
+    AiaRobotSpawnPoller poller = new AiaRobotSpawnPoller(
+        "jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8",
+        "root",
+        "password",
+        "main",
+        aia,
+        adapter
+    );
+
+    poller.setBatchSize(20);
+    poller.runOnce();
+}
+```
+
+넣는 위치:
+
+```text
+서버 DB 로드 완료 후
+맵/NPC/월드 로드 완료 후
+유저 접속 오픈 전 또는 게임 루프 시작 직전
+```
+
+자세한 위치와 Adapter 구현 예시는 `docs/USAGE.md`에 있습니다.
+
+## 기존 서버에서 반드시 작성해야 하는 코드
+
+기존 게임서버 프로젝트 안에 서버 전용 Adapter를 만듭니다.
+
+```java
+public class MyServerAiaRobotAdapter implements AiaRobotSpawnAdapter {
+    public boolean exists(AiaRobotSpawnRequest request) throws Exception {
+        return false;
+    }
+
+    public long createAndSpawn(AiaRobotSpawnRequest request) throws Exception {
+        // 1. 기존 서버 IdFactory로 objectId 발급
+        // 2. 기존 서버 robot/character 테이블 insert
+        // 3. 기본 아이템/스킬 지급
+        // 4. request.locX / locY / locMap / heading 적용
+        // 5. 기존 World에 로봇 객체 등록
+        // 6. 기존 AI scheduler에 등록
+        // 7. objectId 반환
+        return 0L;
+    }
+
+    public void afterSpawn(AiaRobotSpawnRequest request, long serverObjectId) throws Exception {
+        // 로그, 브로드캐스트, 추가 초기화
+    }
+}
+```
+
+서버마다 클래스명이 다르므로 위 코드는 그대로 끝나는 코드가 아니라, 기존 서버의 `IdFactory`, `CharacterTable`, `RobotTable`, `World`, `Inventory`, `Skill`, `AI scheduler`에 연결해야 하는 위치를 보여주는 기준 코드입니다.
+
+## 운영 확인
+
+Spawn Queue:
+
+```http
+GET /dashboard/robot-spawn-queue/gui?server_name=main
+GET /dashboard/robot-spawn-queue/gui?status=failed&server_name=main
+```
+
+복구:
+
+```http
+POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
+POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
+```
+
+AI 대시보드:
+
+```http
+GET /dashboard/robot-ai/gui
+```
+
+## 현재 짧은 파일 구조
 
 ```text
 app/models/req.py       요청 모델
@@ -54,97 +228,9 @@ app/services/autonomy.py    자율운영 설정/프로필 서비스
 app/ui/spawn_queue.py       Spawn Queue GUI
 ```
 
-## 기본 사용 순서
-
-1. Python 가상환경 생성 및 의존성 설치.
-2. `.env` 설정.
-3. MySQL 5.5용 SQL 적용.
-4. AIA 실행.
-5. `POST /robot/spawn-requests`로 로봇 생성 요청 생성.
-6. 게임서버 Java 8 `AiaRobotSpawnPoller`와 `AiaRobotSpawnAdapter` 연결.
-7. `/api/v1/robot/ops-tick`으로 판단 루프 연동.
-8. `/dashboard/robot-spawn-queue/gui?server_name=main`과 `/dashboard/robot-ai/gui`로 운영 확인.
-
-자세한 사용방법:
-
-```text
-docs/USAGE.md
-```
-
-## 실행
-
-설치/준비:
-
-```bash
-python runners/setup/bootstrap_local.py
-```
-
-AIA 실행:
-
-```bash
-python runners/server/run_local_aia.py
-```
-
-Smoke 테스트:
-
-```bash
-python runners/smoke/ops_tick_smoke.py
-python runners/smoke/robot_crud_smoke.py
-```
-
-## DB 적용
-
-```bash
-mysql -u root -p your_game_db < sql/aia_robot_schema.sql
-mysql -u root -p your_game_db < sql/aia_robot_spawn_request_mysql55.sql
-```
-
-적용 후 확인:
-
-```http
-GET /health/details
-```
-
-`mysql.missing_tables`가 빈 배열이어야 합니다.
-
-## 로봇 없는 서버 연동 요약
-
-1. 게임 DB에 MySQL 5.5용 SQL을 적용합니다.
-2. AIA에서 로봇 생성 요청을 생성합니다.
-3. 게임서버 Java 8 시작 루틴에 poller를 연결합니다.
-4. 서버별 Adapter의 `createAndSpawn()`에 기존 서버의 `IdFactory`, DB insert, world spawn, AI scheduler 로직을 연결합니다.
-
-서버 연동 문서:
-
-```text
-docs/SERVER-INTEGRATION.md
-```
-
-## 주요 API
-
-```http
-GET  /health
-GET  /health/details
-GET  /metrics
-POST /api/v1/robot/ops-tick
-GET  /robot
-POST /robot/spawn-requests
-POST /robot/profile
-GET  /dashboard/robot-ai/gui
-GET  /dashboard/robot-spawn-queue/gui?server_name=main
-POST /dashboard/robot-spawn-queue/retry-failed?server_name=main&limit=50
-POST /dashboard/robot-spawn-queue/recover-claimed?server_name=main&older_than_minutes=10&limit=50
-```
-
-전체 API 요약:
-
-```text
-docs/API.md
-```
-
 ## 테스트
 
-권장 전체 점검:
+전체 점검:
 
 ```bash
 python runners/quality/run_quality_gates.py
@@ -161,27 +247,20 @@ pytest tests/test_spawn_ui.py
 pytest tests/test_mysql55.py
 ```
 
-선택형 MySQL 통합 테스트:
+MySQL 통합 테스트:
 
 ```bash
 AIA_TEST_MYSQL_DSN=mysql+pymysql://root:root@127.0.0.1:3306/aia_ci \
 python -m pytest tests/test_mysql_spawn_queue_integration.py
 ```
 
-Windows 전체 게이트:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File runners/quality/run_quality_gates.ps1
-```
-
-## 유지 문서
+## 상세 문서
 
 ```text
-README.md
-docs/USAGE.md
-docs/SERVER-INTEGRATION.md
-docs/API.md
-docs/PROJECT-STRUCTURE.md
-docs/REFACTOR-CHECKLIST.md
-docs/THIRD-PARTY-REVIEW.md
+docs/USAGE.md                 실제 서버 연동 절차
+docs/SERVER-INTEGRATION.md    서버 연동 상세
+docs/API.md                   API 요약
+docs/PROJECT-STRUCTURE.md     폴더 구조
+docs/REFACTOR-CHECKLIST.md    정리 내역
+docs/THIRD-PARTY-REVIEW.md    제3자 점검
 ```
