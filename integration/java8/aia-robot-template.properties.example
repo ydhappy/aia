@@ -9,11 +9,14 @@ aia.class.elf=2
 aia.class.wizard=3
 aia.class.default=1
 
-# Optional name prefixes. AIA spawn request name is still the primary value.
+# Optional neutral name prefix.
+# The primary name comes from aia_robot_spawn_request.name.
+# Keep class/job words out of the name unless your server policy requires them.
 aia.namePrefix.default=AIA
-aia.namePrefix.knight=AIA기사
-aia.namePrefix.elf=AIA요정
-aia.namePrefix.wizard=AIA마법사
+aia.namePrefix.royal=AIA
+aia.namePrefix.knight=AIA
+aia.namePrefix.elf=AIA
+aia.namePrefix.wizard=AIA
 
 # Spawn HP/MP fallback values. Existing server formulas may override these.
 aia.hp.default=100
