@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from app.core.security import verify_api_key
-from app.models.request_models import DecideRequest, ObserveRequest
-from app.models.response_models import DecideResponse, ObserveResponse
+from app.models.req import DecideRequest, ObserveRequest
+from app.models.res import DecideResponse, ObserveResponse
 from app.services.agent_service import agent_service
 
 
