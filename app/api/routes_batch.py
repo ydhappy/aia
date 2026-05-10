@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.config import settings
 from app.core.security import verify_api_key
-from app.models.batch_models import BatchDecideRequest, BatchDecideResponse, BatchObserveRequest, BatchObserveResponse
+from app.models.batch import BatchDecideRequest, BatchDecideResponse, BatchObserveRequest, BatchObserveResponse
 from app.services.agent_service import agent_service
 
 
