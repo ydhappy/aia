@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import verify_api_key
-from app.models.request_models import (
+from app.models.req import (
     RobotEventRequest,
     RobotFeedbackRequest,
     RobotLearningDigestRequest,
@@ -9,7 +9,7 @@ from app.models.request_models import (
     RobotProfileRequest,
     RobotSpawnRequestCreateRequest,
 )
-from app.models.response_models import (
+from app.models.res import (
     AgentTraceResponse,
     RobotDeleteResponse,
     RobotEventResponse,
