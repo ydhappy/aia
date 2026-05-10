@@ -1,0 +1,25 @@
+# AIA Java server connector settings
+# Copy this file to your game server config directory, for example:
+#   config/aia-server.properties
+
+# AIA HTTP server
+# If ENABLE_API_KEY_AUTH=true in AIA .env, set the same key here.
+aia.baseUrl=http://127.0.0.1:8000
+aia.apiKey=
+
+# Game DB that contains aia_robot_spawn_request.
+# MySQL 5.5 uses utf8, not utf8mb4.
+aia.jdbcUrl=jdbc:mysql://127.0.0.1:3306/your_game_db?useUnicode=true&characterEncoding=utf8
+aia.dbUser=root
+aia.dbPassword=password
+
+# Must match POST /robot/spawn-requests server_name.
+aia.serverName=main
+
+# Spawn queue polling options.
+aia.spawnBatchSize=20
+aia.healthCheckBeforeSpawn=true
+
+# HTTP timeouts.
+aia.connectTimeoutMs=3000
+aia.readTimeoutMs=5000
