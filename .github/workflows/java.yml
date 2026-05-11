@@ -1,0 +1,28 @@
+name: java8
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  java8:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup jdk8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: compile
+        run: |
+          find integration/java8 -name "*.java" > sources.txt
+          if [ -s sources.txt ]; then
+            javac -encoding UTF-8 @sources.txt
+          fi
