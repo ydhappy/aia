@@ -1,0 +1,29 @@
+name: release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: build zip
+        run: |
+          mkdir -p build
+          zip -r build/aia.zip \
+            app \
+            integration \
+            sql \
+            docs \
+            requirements.txt \
+            README.md
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: aia
+          path: build/aia.zip
