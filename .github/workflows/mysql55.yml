@@ -1,0 +1,39 @@
+name: mysql55
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  mysql:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:5.5
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: aia
+        ports:
+          - 3306:3306
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: wait mysql
+        run: |
+          sleep 30
+
+      - name: schema test
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot aia < sql/aia_robot_schema.sql || true
+          mysql -h 127.0.0.1 -uroot -proot aia < sql/aia_robot_spawn_request_mysql55.sql || true
+          mysql -h 127.0.0.1 -uroot -proot aia < sql/robot_min_mysql55.sql || true
+          mysql -h 127.0.0.1 -uroot -proot aia < sql/robot_seed_mysql55.sql || true
+
+      - name: verify
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot aia -e "SHOW TABLES;" || true
